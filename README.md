@@ -4,7 +4,7 @@ A full-stack real-time location-based chat application built for the Software En
 
 ## About
 
-geo-chat allows users to communicate based on their geographic location. The app combines a modern React frontend with a Node.js backend powered by Express and PostgreSQL, using Sequelize ORM for database management.
+geo-chat allows users to communicate and play games based on their geographic location. The app combines a modern React frontend with a Node.js backend powered by Express and PostgreSQL, using Sequelize ORM for database management.
 
 ## Tech Stack
 
