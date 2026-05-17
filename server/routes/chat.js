@@ -9,9 +9,7 @@ const IndividualniRazgovor = require('../models/IndividualniRazgovor');
 const GrupniRazgovor = require('../models/GrupniRazgovor');
 const ClanstvoUGrupi = require('../models/ClanstvoUGrupi');
 
-// ─── Middleware: provjeri da je korisnik prijavljen ──────────────────────────
-// Jednostavna provjera — email dolazi iz headera koji postavlja frontend
-// nakon login-a (X-User-Email). U produkciji ovo bi bio JWT middleware.
+
 function requireAuth(req, res, next) {
   const email = req.headers['x-user-email'];
   if (!email) return res.status(401).json({ error: 'Nije autoriziran' });
@@ -19,8 +17,7 @@ function requireAuth(req, res, next) {
   next();
 }
 
-// ─── GET /api/korisnici/search?q=tekst ──────────────────────────────────────
-// Pretraga korisnika po imenu/prezimenu/emailu (za autocomplete pri kreir. chata)
+
 router.get('/korisnici/search', requireAuth, async (req, res) => {
   const { q } = req.query;
   if (!q || q.trim().length < 2) return res.json([]);
@@ -200,7 +197,7 @@ router.post('/chats/individual', requireAuth, async (req, res) => {
   }
 });
 
-// ─── POST /api/chats/group ───────────────────────────────────────────────────
+
 // Kreiraj novu grupu
 router.post('/chats/group', requireAuth, async (req, res) => {
   const adminEmail = req.userEmail;

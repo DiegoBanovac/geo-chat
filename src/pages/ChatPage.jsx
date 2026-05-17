@@ -4,7 +4,12 @@ import {
   kreirajIndividualniChat,
   kreirajGrupu,
   pretraziKorisnike,
+  dohvatiPoruke,
+  dohvatiPrice,
+  uploadPricu,
+  oznaciBrojPriče,
 } from "../lib/supabase";
+import socket from "../lib/socket";
 
 const MapGridBackground = () => (
   <div className="absolute inset-0 overflow-hidden pointer-events-none">
@@ -63,6 +68,32 @@ const SpinnerIcon = () => (
     <path d="M21 12a9 9 0 1 1-6.219-8.56" />
   </svg>
 );
+const SendIcon = () => (
+  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <line x1="22" y1="2" x2="11" y2="13" /><polygon points="22 2 15 22 11 13 2 9 22 2" />
+  </svg>
+);
+const PinIcon = () => (
+  <svg width="11" height="11" viewBox="0 0 24 24" fill="currentColor">
+    <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/>
+  </svg>
+);
+const ImageIcon = () => (
+  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+    <rect x="3" y="3" width="18" height="18" rx="2" /><circle cx="8.5" cy="8.5" r="1.5" />
+    <polyline points="21 15 16 10 5 21" />
+  </svg>
+);
+const ChevronLeftIcon = () => (
+  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+    <polyline points="15 18 9 12 15 6" />
+  </svg>
+);
+const ChevronRightIcon = () => (
+  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+    <polyline points="9 18 15 12 9 6" />
+  </svg>
+);
 
 const AVATAR_COLORS = [
   "bg-teal-600","bg-cyan-600","bg-blue-600",
@@ -80,7 +111,7 @@ const getAvatarColor = (name = "") => {
 const Avatar = ({ name = "", size = "md" }) => {
   const sz = size === "sm" ? "w-9 h-9 text-xs" : "w-11 h-11 text-sm";
   return (
-    <div className={`${sz} ${getAvatarColor(name)} rounded-full flex items-center justify-center font-semibold text-white flex-shrink-0`}>
+    <div className={`${sz} ${getAvatarColor(name)} rounded-full flex items-center justify-center font-semibold text-white shrink-0`}>
       {getInitials(name)}
     </div>
   );
@@ -289,7 +320,7 @@ const NewGroupModal = ({ onClose, onCreate }) => {
                 <div className="flex-1 min-w-0">
                   <p className="text-xs text-slate-300 font-medium truncate">{c.ime_korisnika} {c.prezime_korisnika}</p>
                 </div>
-                <button onClick={() => removeClan(c.email_korisnika)} className="text-slate-500 hover:text-red-400 transition-colors flex-shrink-0"><XIcon /></button>
+                <button onClick={() => removeClan(c.email_korisnika)} className="text-slate-500 hover:text-red-400 transition-colors shrink-0"><XIcon /></button>
               </div>
             ))}
           </div>
@@ -320,7 +351,7 @@ const ChatItem = ({ chat, isActive, onClick }) => (
     <div className="flex-1 min-w-0">
       <div className="flex items-center justify-between mb-0.5">
         <span className={`font-medium text-sm truncate ${isActive ? "text-teal-400" : "text-slate-200"}`}>{chat.name}</span>
-        <span className="text-[10px] text-slate-600 flex-shrink-0 ml-2">{chat.type === "group" ? `${chat.memberCount} čl.` : ""}</span>
+        <span className="text-[10px] text-slate-600 shrink-0 ml-2">{chat.type === "group" ? `${chat.memberCount} čl.` : ""}</span>
       </div>
       <p className="text-xs text-slate-500 truncate">{chat.type === "group" ? "Grupni razgovor" : "Privatni razgovor"}</p>
     </div>
@@ -402,14 +433,14 @@ const ProfileFooter = ({ korisnik, onOdjava }) => {
   const name = `${korisnik.ime_korisnika} ${korisnik.prezime_korisnika}`;
   return (
     <div className="px-4 py-3 border-t border-slate-800/60 flex items-center gap-3">
-      <div className={`w-8 h-8 rounded-full ${getAvatarColor(name)} flex items-center justify-center text-white text-xs font-bold flex-shrink-0`}>
+      <div className={`w-8 h-8 rounded-full ${getAvatarColor(name)} flex items-center justify-center text-white text-xs font-bold shrink-0`}>
         {getInitials(name)}
       </div>
       <div className="flex-1 min-w-0">
         <p className="text-sm font-medium text-slate-200 truncate">{name}</p>
         <p className="text-xs text-slate-600 truncate">{korisnik.email_korisnika}</p>
       </div>
-      <button onClick={onOdjava} className="text-xs text-slate-500 hover:text-teal-400 transition-colors flex-shrink-0 px-2 py-1 rounded-lg hover:bg-slate-800/60">
+      <button onClick={onOdjava} className="text-xs text-slate-500 hover:text-teal-400 transition-colors shrink-0 px-2 py-1 rounded-lg hover:bg-slate-800/60">
         Odjava
       </button>
     </div>
@@ -428,34 +459,465 @@ const EmptyState = () => (
   </div>
 );
 
-const ChatView = ({ chat }) => (
-  <>
-    <div className="flex items-center gap-3 px-5 py-4 border-b border-slate-800/60">
-      <Avatar name={chat.name} />
-      <div>
-        <h2 className="text-white font-semibold text-sm">{chat.name}</h2>
-        <p className="text-xs text-slate-500">
-          {chat.type === "group" ? `${chat.memberCount} članova · Grupni razgovor` : "Privatni razgovor"}
-        </p>
+// ─── Stories: StoryUploadModal ───────────────────────────────────────────────
+
+const StoryUploadModal = ({ onClose, onUploaded }) => {
+  const [file, setFile] = useState(null);
+  const [preview, setPreview] = useState(null);
+  const [location, setLocation] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+  const fileRef = useRef(null);
+
+  const handleFile = (e) => {
+    const f = e.target.files[0];
+    if (!f) return;
+    setFile(f);
+    setPreview(URL.createObjectURL(f));
+  };
+
+  const handleDrop = (e) => {
+    e.preventDefault();
+    const f = e.dataTransfer.files[0];
+    if (f && f.type.startsWith("image/")) {
+      setFile(f);
+      setPreview(URL.createObjectURL(f));
+    }
+  };
+
+  const handleUpload = async () => {
+    if (!file) return;
+    setLoading(true);
+    setError("");
+    try {
+      const nova = await uploadPricu({ file, lokacija_naziv: location.trim() || null });
+      onUploaded(nova);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+      <div className="bg-slate-900 border border-slate-700/60 rounded-2xl p-6 w-full max-w-sm shadow-2xl">
+        <div className="flex items-center justify-between mb-5">
+          <div>
+            <h2 className="text-white font-semibold text-base">Nova priča</h2>
+            <p className="text-slate-500 text-xs mt-0.5">Briše se automatski za 24 sata</p>
+          </div>
+          <button onClick={onClose} className="text-slate-500 hover:text-slate-300 p-1 transition-colors">
+            <XIcon />
+          </button>
+        </div>
+
+        {error && (
+          <div className="mb-4 bg-red-500/10 border border-red-500/20 text-red-400 text-xs rounded-xl px-3 py-2">
+            {error}
+          </div>
+        )}
+
+        {/* Image picker */}
+        <div
+          onClick={() => fileRef.current?.click()}
+          onDrop={handleDrop}
+          onDragOver={(e) => e.preventDefault()}
+          className="mb-4 h-52 rounded-xl overflow-hidden border-2 border-dashed border-slate-700 hover:border-teal-500/60 transition-colors cursor-pointer flex items-center justify-center bg-slate-800/40"
+        >
+          {preview ? (
+            <img src={preview} className="w-full h-full object-cover" alt="preview" />
+          ) : (
+            <div className="text-center select-none">
+              <div className="inline-flex items-center justify-center w-12 h-12 rounded-xl bg-slate-700/60 text-slate-400 mb-3">
+                <ImageIcon />
+              </div>
+              <p className="text-slate-400 text-sm font-medium">Klikni ili prevuci sliku</p>
+              <p className="text-slate-600 text-xs mt-1">JPG, PNG, GIF, WebP · max 10 MB</p>
+            </div>
+          )}
+        </div>
+        <input ref={fileRef} type="file" accept="image/*" onChange={handleFile} className="hidden" />
+
+        {/* Location */}
+        <div className="mb-5">
+          <label className="flex items-center gap-1.5 text-sm font-medium text-slate-400 mb-1.5">
+            <PinIcon /> Lokacija <span className="text-slate-600 font-normal">(opcionalno)</span>
+          </label>
+          <input
+            type="text"
+            value={location}
+            onChange={(e) => setLocation(e.target.value)}
+            placeholder="npr. Rijeka, Hrvatska"
+            className="w-full bg-slate-800/60 border border-slate-700/60 rounded-xl px-4 py-2.5 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-teal-500/70 transition-all"
+          />
+        </div>
+
+        <div className="flex gap-2">
+          <button
+            onClick={onClose}
+            className="flex-1 py-2.5 text-sm font-medium text-slate-400 hover:text-slate-200 border border-slate-700 hover:border-slate-600 rounded-xl transition-all"
+          >
+            Odustani
+          </button>
+          <button
+            onClick={handleUpload}
+            disabled={!file || loading}
+            className="flex-1 py-2.5 text-sm font-semibold bg-teal-500 hover:bg-teal-400 disabled:opacity-40 disabled:cursor-not-allowed text-white rounded-xl transition-colors flex items-center justify-center gap-2"
+          >
+            {loading ? <><SpinnerIcon /> Objavljujem...</> : "Objavi priču"}
+          </button>
+        </div>
       </div>
     </div>
-    <div className="flex-1 flex items-center justify-center">
-      <div className="text-center px-6">
-        <div className={`inline-flex items-center justify-center w-14 h-14 rounded-2xl ${getAvatarColor(chat.name)} mb-4`}>
-          <span className="text-white font-bold text-lg">{getInitials(chat.name)}</span>
+  );
+};
+
+// ─── Stories: StoryViewer ────────────────────────────────────────────────────
+
+const timeAgo = (ts) => {
+  const diff = Date.now() - new Date(ts).getTime();
+  const h = Math.floor(diff / 3600000);
+  const m = Math.floor((diff % 3600000) / 60000);
+  if (h >= 1) return `${h}h`;
+  if (m >= 1) return `${m}m`;
+  return "upravo";
+};
+
+const StoryViewer = ({ group, startIndex, korisnik, onClose }) => {
+  const [currentIdx, setCurrentIdx] = useState(startIndex);
+  const story = group.price[currentIdx];
+  const name = `${group.ime} ${group.prezime}`;
+
+  useEffect(() => {
+    if (story && !group.isMine && !story.viewed) {
+      oznaciBrojPriče(story.id_price).catch(() => {});
+    }
+  }, [story?.id_price]);
+
+  // Keyboard navigation
+  useEffect(() => {
+    const handler = (e) => {
+      if (e.key === "ArrowRight") goNext();
+      if (e.key === "ArrowLeft")  goPrev();
+      if (e.key === "Escape")     onClose();
+    };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, [currentIdx]);
+
+  const goNext = () => {
+    if (currentIdx < group.price.length - 1) setCurrentIdx((i) => i + 1);
+    else onClose();
+  };
+  const goPrev = () => {
+    if (currentIdx > 0) setCurrentIdx((i) => i - 1);
+  };
+
+  return (
+    <div
+      className="fixed inset-0 bg-black z-50 flex items-center justify-center"
+      onClick={onClose}
+    >
+      <div
+        className="relative w-full max-w-sm h-full flex flex-col"
+        onClick={(e) => e.stopPropagation()}
+      >
+        {/* Progress bars */}
+        <div className="absolute top-0 left-0 right-0 flex gap-1 p-3 z-10">
+          {group.price.map((_, i) => (
+            <div key={i} className="h-0.5 flex-1 rounded-full bg-white/20 overflow-hidden">
+              <div
+                className={`h-full rounded-full transition-all ${i < currentIdx ? "bg-white w-full" : i === currentIdx ? "bg-white w-full" : "w-0"}`}
+              />
+            </div>
+          ))}
         </div>
-        <h3 className="text-slate-300 font-medium text-sm mb-1">{chat.name}</h3>
-        <p className="text-slate-600 text-xs leading-relaxed">
-          {chat.type === "group" ? `Grupni razgovor · ${chat.memberCount} članova` : `Privatni razgovor · ${chat.drugiEmail}`}
-        </p>
-        <div className="mt-4 inline-flex items-center gap-1.5 bg-slate-800/50 border border-slate-700/40 rounded-full px-3 py-1.5">
-          <div className="w-1.5 h-1.5 rounded-full bg-teal-500 animate-pulse" />
-          <span className="text-xs text-slate-500">Slanje poruka uskoro dostupno</span>
+
+        {/* Header */}
+        <div className="absolute top-6 left-0 right-0 flex items-center gap-2.5 px-3 z-10">
+          <div className={`w-8 h-8 rounded-full ${getAvatarColor(name)} flex items-center justify-center text-white text-xs font-bold shrink-0`}>
+            {getInitials(name)}
+          </div>
+          <div className="flex-1 min-w-0">
+            <p className="text-white text-sm font-semibold leading-none">{name}</p>
+            <p className="text-white/50 text-xs mt-0.5">{timeAgo(story.vrijeme_objave)}</p>
+          </div>
+          <button
+            onClick={onClose}
+            className="text-white/60 hover:text-white p-1 transition-colors"
+          >
+            <XIcon />
+          </button>
+        </div>
+
+        {/* Image */}
+        <div className="flex-1 relative">
+          <img
+            src={story.sadrzaj_url}
+            alt=""
+            className="absolute inset-0 w-full h-full object-contain"
+          />
+
+          {/* Location tag */}
+          {story.lokacija_naziv && (
+            <div className="absolute bottom-6 left-0 right-0 flex justify-center pointer-events-none">
+              <div className="bg-black/55 backdrop-blur-md text-white text-xs px-3.5 py-2 rounded-full flex items-center gap-1.5 border border-white/10">
+                <PinIcon />
+                {story.lokacija_naziv}
+              </div>
+            </div>
+          )}
+
+          {/* Navigation — left zone */}
+          <button
+            onClick={(e) => { e.stopPropagation(); goPrev(); }}
+            className={`absolute left-0 top-0 w-1/4 h-full flex items-center justify-start pl-2 ${currentIdx === 0 ? "opacity-0 pointer-events-none" : "opacity-100"}`}
+            aria-label="Prethodna"
+          >
+            <div className="bg-black/30 rounded-full p-1 text-white/70 hover:text-white transition-colors">
+              <ChevronLeftIcon />
+            </div>
+          </button>
+
+          {/* Navigation — right zone */}
+          <button
+            onClick={(e) => { e.stopPropagation(); goNext(); }}
+            className="absolute right-0 top-0 w-1/4 h-full flex items-center justify-end pr-2"
+            aria-label="Sljedeća"
+          >
+            <div className="bg-black/30 rounded-full p-1 text-white/70 hover:text-white transition-colors">
+              <ChevronRightIcon />
+            </div>
+          </button>
         </div>
       </div>
     </div>
-  </>
+  );
+};
+
+// ─── Stories: StoriesStrip ───────────────────────────────────────────────────
+
+const StoryBubble = ({ label, hasUnviewed, isMine, noStory, onClick }) => (
+  <div className="flex flex-col items-center gap-1 shrink-0 cursor-pointer" onClick={onClick}>
+    <div className={`p-0.5 rounded-full ${hasUnviewed ? "bg-linear-to-tr from-teal-500 to-cyan-400" : isMine && !noStory ? "bg-linear-to-tr from-teal-500 to-cyan-400" : "bg-slate-700"}`}>
+      <div className="p-0.5 bg-slate-900 rounded-full">
+        <div className={`w-10 h-10 rounded-full ${getAvatarColor(label)} flex items-center justify-center text-white text-xs font-bold relative`}>
+          {getInitials(label)}
+          {noStory && (
+            <div className="absolute -bottom-0.5 -right-0.5 w-4 h-4 bg-teal-500 rounded-full flex items-center justify-center border-2 border-slate-900">
+              <span className="text-white text-[9px] font-bold leading-none">+</span>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+    <span className="text-[9px] text-slate-500 truncate max-w-11 text-center leading-tight">
+      {label.split(" ")[0]}
+    </span>
+  </div>
 );
+
+const StoriesStrip = ({ korisnik, storyGroups, onOpenStory, onAddStory }) => {
+  const myName = `${korisnik.ime_korisnika} ${korisnik.prezime_korisnika}`;
+  const myGroup = storyGroups.find((g) => g.isMine);
+  const others = storyGroups.filter((g) => !g.isMine);
+
+  return (
+    <div className="px-3 pt-3 pb-2 border-b border-slate-800/60">
+      <p className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider mb-2.5 px-0.5">
+        Priče
+      </p>
+      <div className="flex gap-3 overflow-x-auto pb-1" style={{ scrollbarWidth: "none" }}>
+        {/* Moja priča / dodaj */}
+        <StoryBubble
+          label={myName}
+          hasUnviewed={false}
+          isMine={true}
+          noStory={!myGroup}
+          onClick={() => (myGroup ? onOpenStory(myGroup, 0) : onAddStory())}
+        />
+
+        {/* Priče ostalih korisnika */}
+        {others.map((group) => (
+          <StoryBubble
+            key={group.email_korisnika}
+            label={`${group.ime} ${group.prezime}`}
+            hasUnviewed={group.hasUnviewed}
+            isMine={false}
+            noStory={false}
+            onClick={() => onOpenStory(group, 0)}
+          />
+        ))}
+
+        {storyGroups.length === 0 && (
+          <p className="text-xs text-slate-600 py-1 px-1">Nema aktivnih priča</p>
+        )}
+      </div>
+    </div>
+  );
+};
+
+// ─── Chat formatters ─────────────────────────────────────────────────────────
+
+const formatTime = (ts) => {
+  const d = new Date(ts);
+  return d.toLocaleTimeString("hr-HR", { hour: "2-digit", minute: "2-digit" });
+};
+
+const ChatView = ({ chat, korisnik }) => {
+  const [messages, setMessages] = useState([]);
+  const [loadingMsgs, setLoadingMsgs] = useState(true);
+  const [inputText, setInputText] = useState("");
+  const bottomRef = useRef(null);
+  const inputRef = useRef(null);
+
+  // Join room and load history when chat changes
+  useEffect(() => {
+    if (!chat) return;
+
+    setMessages([]);
+    setLoadingMsgs(true);
+
+    if (!socket.connected) socket.connect();
+    socket.emit("join_chat", { chatId: chat.id });
+
+    const params =
+      chat.type === "individual"
+        ? { type: "individual", e1: chat.email_korisnika_1, e2: chat.email_korisnika_2 }
+        : { type: "group", naziv_grupe: chat.naziv_grupe };
+
+    dohvatiPoruke(params)
+      .then(setMessages)
+      .catch(() => {})
+      .finally(() => setLoadingMsgs(false));
+
+    const handleNew = (msg) => setMessages((prev) => [...prev, msg]);
+    socket.on("new_message", handleNew);
+
+    return () => {
+      socket.emit("leave_chat", { chatId: chat.id });
+      socket.off("new_message", handleNew);
+    };
+  }, [chat.id]);
+
+  // Auto-scroll to latest message
+  useEffect(() => {
+    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [messages]);
+
+  const sendMessage = () => {
+    const text = inputText.trim();
+    if (!text) return;
+
+    const payload = {
+      chatId: chat.id,
+      text,
+      type: chat.type,
+      senderEmail: korisnik.email_korisnika,
+    };
+    if (chat.type === "individual") {
+      payload.e1 = chat.email_korisnika_1;
+      payload.e2 = chat.email_korisnika_2;
+    } else {
+      payload.naziv_grupe = chat.naziv_grupe;
+    }
+
+    socket.emit("send_message", payload);
+    setInputText("");
+    inputRef.current?.focus();
+  };
+
+  const handleKeyDown = (e) => {
+    if (e.key === "Enter" && !e.shiftKey) {
+      e.preventDefault();
+      sendMessage();
+    }
+  };
+
+  return (
+    <>
+      {/* Header */}
+      <div className="flex items-center gap-3 px-5 py-4 border-b border-slate-800/60 shrink-0">
+        <Avatar name={chat.name} />
+        <div>
+          <h2 className="text-white font-semibold text-sm">{chat.name}</h2>
+          <p className="text-xs text-slate-500">
+            {chat.type === "group"
+              ? `${chat.memberCount} članova · Grupni razgovor`
+              : "Privatni razgovor"}
+          </p>
+        </div>
+      </div>
+
+      {/* Message list */}
+      <div className="flex-1 overflow-y-auto px-5 py-4 space-y-3">
+        {loadingMsgs ? (
+          <div className="flex items-center justify-center py-12 text-slate-600">
+            <SpinnerIcon />
+            <span className="ml-2 text-sm">Učitavam poruke...</span>
+          </div>
+        ) : messages.length === 0 ? (
+          <div className="flex items-center justify-center py-12">
+            <p className="text-slate-600 text-sm">Nema poruka. Pošalji prvu!</p>
+          </div>
+        ) : (
+          messages.map((msg) => {
+            const isMine = msg.posiljatelj_email === korisnik.email_korisnika;
+            return (
+              <div
+                key={msg.id_poruke}
+                className={`flex items-end gap-2 ${isMine ? "flex-row-reverse" : ""}`}
+              >
+                {!isMine && <Avatar name={msg.posiljatelj_ime} size="sm" />}
+                <div className={`flex flex-col gap-0.5 max-w-xs lg:max-w-md ${isMine ? "items-end" : "items-start"}`}>
+                  {chat.type === "group" && !isMine && (
+                    <span className="text-xs text-slate-500 px-1">{msg.posiljatelj_ime}</span>
+                  )}
+                  <div
+                    className={`px-4 py-2.5 rounded-2xl text-sm leading-relaxed ${
+                      isMine
+                        ? "bg-teal-600 text-white rounded-br-sm"
+                        : "bg-slate-800 text-slate-200 rounded-bl-sm"
+                    }`}
+                  >
+                    {msg.poruka_tekst}
+                  </div>
+                  <span className="text-[10px] text-slate-600 px-1">
+                    {formatTime(msg.vrijeme_slanja)}
+                  </span>
+                </div>
+              </div>
+            );
+          })
+        )}
+        <div ref={bottomRef} />
+      </div>
+
+      {/* Input bar */}
+      <div className="px-4 py-3 border-t border-slate-800/60 shrink-0">
+        <div className="flex items-center gap-2 bg-slate-800/60 border border-slate-700/60 rounded-xl px-4 py-2.5 focus-within:border-teal-500/50 transition-all">
+          <input
+            ref={inputRef}
+            type="text"
+            value={inputText}
+            onChange={(e) => setInputText(e.target.value)}
+            onKeyDown={handleKeyDown}
+            placeholder="Napiši poruku..."
+            className="flex-1 bg-transparent text-sm text-white placeholder-slate-500 focus:outline-none"
+          />
+          <button
+            onClick={sendMessage}
+            disabled={!inputText.trim()}
+            className="text-teal-500 hover:text-teal-400 disabled:text-slate-700 transition-colors shrink-0"
+          >
+            <SendIcon />
+          </button>
+        </div>
+      </div>
+    </>
+  );
+};
 
 export default function ChatPage({ korisnik, onOdjava }) {
   const [chats, setChats] = useState([]);
@@ -466,6 +928,30 @@ export default function ChatPage({ korisnik, onOdjava }) {
   const [searchQuery, setSearchQuery] = useState("");
   const [showNewChat, setShowNewChat] = useState(false);
   const [showNewGroup, setShowNewGroup] = useState(false);
+
+  // ── Priče ──────────────────────────────────────────────────────────────────
+  const [storyGroups, setStoryGroups] = useState([]);
+  const [activeStoryGroup, setActiveStoryGroup] = useState(null); // { group, startIdx }
+  const [showStoryUpload, setShowStoryUpload] = useState(false);
+
+  const ucitajPrice = useCallback(async () => {
+    try {
+      const data = await dohvatiPrice();
+      setStoryGroups(data);
+    } catch { /* tiha greška — priče nisu kritične */ }
+  }, []);
+
+  useEffect(() => { ucitajPrice(); }, [ucitajPrice]);
+
+  const handleStoryUploaded = () => {
+    setShowStoryUpload(false);
+    ucitajPrice();
+  };
+  // ──────────────────────────────────────────────────────────────────────────
+
+  useEffect(() => {
+    return () => { socket.disconnect(); };
+  }, []);
 
   const ucitajChatove = useCallback(async () => {
     setLoading(true);
@@ -511,8 +997,14 @@ export default function ChatPage({ korisnik, onOdjava }) {
     <div className="min-h-screen bg-slate-950 flex relative">
       <MapGridBackground />
 
-      <aside className="relative z-10 w-80 flex-shrink-0 flex flex-col bg-slate-900/70 backdrop-blur-sm border-r border-slate-800/60">
+      <aside className="relative z-10 w-80 shrink-0 flex flex-col bg-slate-900/70 backdrop-blur-sm border-r border-slate-800/60">
         <SidebarHeader onNewChat={() => setShowNewChat(true)} onNewGroup={() => setShowNewGroup(true)} />
+        <StoriesStrip
+          korisnik={korisnik}
+          storyGroups={storyGroups}
+          onOpenStory={(group, idx) => setActiveStoryGroup({ group, startIdx: idx })}
+          onAddStory={() => setShowStoryUpload(true)}
+        />
         <Tabs active={activeTab} onChange={setActiveTab} counts={counts} />
         <ChatSearch value={searchQuery} onChange={setSearchQuery} />
 
@@ -549,11 +1041,26 @@ export default function ChatPage({ korisnik, onOdjava }) {
       </aside>
 
       <main className="relative z-10 flex-1 flex flex-col bg-slate-950/50 backdrop-blur-sm">
-        {activeChat ? <ChatView chat={activeChat} /> : <EmptyState />}
+        {activeChat ? <ChatView chat={activeChat} korisnik={korisnik} /> : <EmptyState />}
       </main>
 
       {showNewChat && <NewChatModal onClose={() => setShowNewChat(false)} onCreate={handleChatCreated} />}
       {showNewGroup && <NewGroupModal onClose={() => setShowNewGroup(false)} onCreate={handleChatCreated} />}
+
+      {showStoryUpload && (
+        <StoryUploadModal
+          onClose={() => setShowStoryUpload(false)}
+          onUploaded={handleStoryUploaded}
+        />
+      )}
+      {activeStoryGroup && (
+        <StoryViewer
+          group={activeStoryGroup.group}
+          startIndex={activeStoryGroup.startIdx}
+          korisnik={korisnik}
+          onClose={() => { setActiveStoryGroup(null); ucitajPrice(); }}
+        />
+      )}
     </div>
   );
 }

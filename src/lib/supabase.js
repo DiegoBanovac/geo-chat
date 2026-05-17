@@ -54,6 +54,63 @@ export async function pretraziKorisnike(query) {
   return data;
 }
 
+// ─── Priče (Stories) ─────────────────────────────────────────────────────────
+
+// Dohvati sve aktivne priče (grupirane po korisniku)
+export async function dohvatiPrice() {
+  const res = await fetch(`${API_BASE}/price`, {
+    headers: { 'Content-Type': 'application/json', ...getAuthHeader() },
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || 'Greška pri dohvatu priča');
+  return data;
+}
+
+// Objavi novu priču (multipart: slika + opcionalna lokacija)
+export async function uploadPricu({ file, lokacija_naziv }) {
+  const fd = new FormData();
+  fd.append('slika', file);
+  if (lokacija_naziv) fd.append('lokacija_naziv', lokacija_naziv);
+
+  const res = await fetch(`${API_BASE}/price`, {
+    method: 'POST',
+    headers: getAuthHeader(), // bez Content-Type — browser postavlja multipart boundary
+    body: fd,
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || 'Greška pri uploadu priče');
+  return data;
+}
+
+// Označi priču kao pregledanu
+export async function oznaciBrojPriče(idPrice) {
+  const res = await fetch(`${API_BASE}/price/${idPrice}/view`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getAuthHeader() },
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || 'Greška');
+  return data;
+}
+
+// ─── Poruke ──────────────────────────────────────────────────────────────────
+
+// Dohvati povijest poruka za chat
+// individual: { type: 'individual', e1, e2 }
+// group:      { type: 'group', naziv_grupe }
+export async function dohvatiPoruke({ type, e1, e2, naziv_grupe }) {
+  const params = new URLSearchParams({ type });
+  if (type === 'individual') { params.set('e1', e1); params.set('e2', e2); }
+  if (type === 'group') { params.set('g', naziv_grupe); }
+
+  const res = await fetch(`${API_BASE}/messages?${params}`, {
+    headers: { 'Content-Type': 'application/json', ...getAuthHeader() },
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || 'Greška pri dohvatu poruka');
+  return data;
+}
+
 // ─── Chatovi ─────────────────────────────────────────────────────────────────
 
 // Dohvati sve chatove trenutnog korisnika
