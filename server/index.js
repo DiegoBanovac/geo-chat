@@ -4,13 +4,16 @@ const express = require('express');
 const cors = require('cors');
 const sequelize = require('./db');
 const authRoutes = require('./routes/auth');
+const chatRoutes = require('./routes/chat');
 
 const app = express();
 const PORT = process.env.PORT || 3001;
 
 app.use(cors({ origin: 'http://localhost:5173' }));
 app.use(express.json());
+
 app.use('/api', authRoutes);
+app.use('/api', chatRoutes);
 app.get('/api/health', (_, res) => res.json({ status: 'ok' }));
 
 sequelize.authenticate()

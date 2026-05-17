@@ -1,6 +1,7 @@
 import { useState } from "react";
 import AuthPage from "./pages/AuthPage";
-import Dashboard from "./pages/Dashboard";
+import ChatPage from "./pages/ChatPage";
+import { odjavaKorisnik } from "./lib/supabase";
 
 export default function App() {
   const [korisnik, setKorisnik] = useState(null);
@@ -10,11 +11,12 @@ export default function App() {
   };
 
   const handleOdjava = () => {
+    odjavaKorisnik(); // briše sessionStorage
     setKorisnik(null);
   };
 
   if (korisnik) {
-    return <Dashboard korisnik={korisnik} onOdjava={handleOdjava} />;
+    return <ChatPage korisnik={korisnik} onOdjava={handleOdjava} />;
   }
 
   return <AuthPage onLogin={handleLogin} />;

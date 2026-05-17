@@ -11,6 +11,7 @@ const Korisnik = sequelize.define('Korisnik', {
   slika_profila:     { type: DataTypes.STRING,   allowNull: true, defaultValue: '' },
 }, {
   tableName: 'korisnik',
+  schema: 'geochat',
   timestamps: false,
 });
 
