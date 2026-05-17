@@ -1,4 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from "react";
+import L from "leaflet";
+import "leaflet/dist/leaflet.css";
 import {
   dohvatiChatove,
   kreirajIndividualniChat,
@@ -8,8 +10,33 @@ import {
   dohvatiPrice,
   uploadPricu,
   oznaciBrojPriče,
+  startGeoGame,
 } from "../lib/supabase";
 import socket from "../lib/socket";
+
+// Fix Leaflet default marker icons for Vite bundler
+delete L.Icon.Default.prototype._getIconUrl;
+L.Icon.Default.mergeOptions({
+  iconRetinaUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png",
+  iconUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png",
+  shadowUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png",
+});
+
+// Load Google Maps script exactly once for the lifetime of the page
+let _mapsPromise = null;
+function loadGoogleMaps(apiKey) {
+  if (window.google?.maps?.StreetViewPanorama) return Promise.resolve(window.google.maps);
+  if (_mapsPromise) return _mapsPromise;
+  _mapsPromise = new Promise((resolve, reject) => {
+    window.__gmCb = () => { delete window.__gmCb; resolve(window.google.maps); };
+    const s = document.createElement("script");
+    s.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}&callback=__gmCb&v=weekly&libraries=streetView`;
+    s.async = true;
+    s.onerror = () => { _mapsPromise = null; reject(new Error("Google Maps failed to load")); };
+    document.head.appendChild(s);
+  });
+  return _mapsPromise;
+}
 
 const MapGridBackground = () => (
   <div className="absolute inset-0 overflow-hidden pointer-events-none">
@@ -758,6 +785,302 @@ const StoriesStrip = ({ korisnik, storyGroups, onOpenStory, onAddStory }) => {
   );
 };
 
+// ─── Geo Igra: komponenti ────────────────────────────────────────────────────
+
+const GameLobby = ({ onCancel }) => (
+  <div className="flex flex-col items-center justify-center h-full gap-6 p-8 text-center">
+    <div className="text-7xl">🌍</div>
+    <div>
+      <h2 className="text-white text-xl font-bold mb-2">Čekanje na protivnika</h2>
+      <p className="text-slate-400 text-sm">Pozivnica je poslana. Čekam prihvaćanje...</p>
+    </div>
+    <div className="flex items-center gap-2 text-slate-500 text-sm">
+      <SpinnerIcon /><span className="ml-1">Čekam odgovor...</span>
+    </div>
+    <button onClick={onCancel}
+      className="px-6 py-2.5 text-sm font-medium text-slate-400 border border-slate-700 hover:border-slate-500 hover:text-slate-200 rounded-xl transition-all">
+      Odustani
+    </button>
+  </div>
+);
+
+const GameRound = ({ runda, idBattle, chatId, korisnik, ukupnoRundi }) => {
+  const [noImagery, setNoImagery] = useState(false);
+  const svRef    = useRef(null);
+  const mapRef   = useRef(null);
+  const markerRef = useRef(null);
+  const guessRef  = useRef(null);
+  const submittedRef = useRef(false);
+  const [guessSet, setGuessSet]   = useState(false);
+  const [submitted, setSubmitted] = useState(false);
+  const [timeLeft, setTimeLeft]   = useState(60);
+
+  const doSubmit = useCallback(() => {
+    if (submittedRef.current) return;
+    submittedRef.current = true;
+    setSubmitted(true);
+    socket.emit("submit_guess", {
+      idBattle,
+      brojRunde: runda.broj_runde,
+      lat: guessRef.current?.lat ?? 0,
+      lng: guessRef.current?.lng ?? 0,
+      email: korisnik.email_korisnika,
+      chatId,
+    });
+  }, [idBattle, runda.broj_runde, korisnik.email_korisnika, chatId]);
+
+  // Timer
+  useEffect(() => {
+    const submit = () => doSubmit();
+    const id = setInterval(() => {
+      setTimeLeft(t => {
+        if (t <= 1) { clearInterval(id); submit(); return 0; }
+        return t - 1;
+      });
+    }, 1000);
+    return () => clearInterval(id);
+  }, [doSubmit]);
+
+  // Leaflet guess map
+  useEffect(() => {
+    if (!mapRef.current) return;
+    const map = L.map(mapRef.current, { zoomControl: true }).setView([20, 0], 2);
+    L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+      attribution: "© OpenStreetMap", maxZoom: 18,
+    }).addTo(map);
+    map.on("click", e => {
+      guessRef.current = { lat: e.latlng.lat, lng: e.latlng.lng };
+      setGuessSet(true);
+      if (markerRef.current) markerRef.current.remove();
+      markerRef.current = L.marker(e.latlng).addTo(map);
+    });
+    return () => map.remove();
+  }, []);
+
+  // Google Street View
+  useEffect(() => {
+    if (!svRef.current) return;
+    const apiKey = import.meta.env.VITE_GOOGLE_MAPS_KEY;
+    if (!apiKey || apiKey.startsWith("OVDJE_")) return;
+    let timeoutId;
+    let cancelled = false;
+    loadGoogleMaps(apiKey).then(maps => {
+      if (cancelled || !svRef.current) return;
+      const pano = new maps.StreetViewPanorama(svRef.current, {
+        ...(runda.pano_id ? { pano: runda.pano_id } : { position: { lat: runda.lat, lng: runda.lng } }),
+        addressControl: false,
+        showRoadLabels: false,
+        fullscreenControl: false,
+        motionTracking: false,
+        motionTrackingControl: false,
+        zoomControl: false,
+      });
+      timeoutId = setTimeout(() => { if (!cancelled) setNoImagery(true); }, 10000);
+      pano.addListener("tiles_loaded", () => clearTimeout(timeoutId));
+    }).catch(() => { if (!cancelled) setNoImagery(true); });
+    return () => { cancelled = true; clearTimeout(timeoutId); };
+  }, [runda.lat, runda.lng]);
+
+  const timerColor = timeLeft > 20 ? "text-teal-400" : timeLeft > 10 ? "text-yellow-400" : "text-red-400";
+  const hasKey = import.meta.env.VITE_GOOGLE_MAPS_KEY && !import.meta.env.VITE_GOOGLE_MAPS_KEY.startsWith("OVDJE_");
+
+  return (
+    <div className="flex flex-col h-full">
+      <div className="flex items-center justify-between px-5 py-3 border-b border-slate-800/60 shrink-0 bg-slate-900/50">
+        <span className="text-slate-400 text-sm">Runda {runda.broj_runde} / {ukupnoRundi}</span>
+        <span className={`font-mono font-bold text-xl ${timerColor}`}>{timeLeft}s</span>
+        <div className="w-24" />
+      </div>
+      <div className="flex flex-1 overflow-hidden">
+        {/* Street View */}
+        <div className="w-[60%] shrink-0 relative" style={{ colorScheme: 'light', isolation: 'isolate' }}>
+          <div ref={svRef} className="w-full h-full bg-slate-900" style={{ colorScheme: 'light' }} />
+          {!hasKey && (
+            <div className="absolute inset-0 flex flex-col items-center justify-center bg-slate-900/95 text-center p-6">
+              <p className="text-5xl mb-4">🗺️</p>
+              <p className="text-slate-300 font-medium text-sm mb-1">Google Maps API ključ nije postavljen</p>
+              <p className="text-slate-500 text-xs">Dodaj VITE_GOOGLE_MAPS_KEY u .env</p>
+            </div>
+          )}
+          {hasKey && noImagery && (
+            <div className="absolute inset-0 flex flex-col items-center justify-center bg-slate-900/95 text-center p-6">
+              <p className="text-5xl mb-4">📷</p>
+              <p className="text-slate-300 font-medium text-sm">Snimka nije dostupna za ovu lokaciju</p>
+              <p className="text-slate-500 text-xs mt-1">Pokušaj pogoditi na temelju koordinata</p>
+            </div>
+          )}
+        </div>
+        {/* Guess map */}
+        <div className="flex-1 flex flex-col border-l border-slate-800/60">
+          <div ref={mapRef} className="flex-1" />
+          <div className="p-3 border-t border-slate-800/60 bg-slate-900/50 shrink-0">
+            <button onClick={doSubmit} disabled={!guessSet || submitted}
+              className="w-full py-2.5 text-sm font-semibold bg-teal-500 hover:bg-teal-400 disabled:opacity-40 disabled:cursor-not-allowed text-white rounded-xl transition-colors">
+              {submitted ? "✓ Predano! Čekam protivnika..." : guessSet ? "Predaj pogađanje" : "Klikni na karti za označiti lokaciju"}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+const RoundResults = ({ rezultati, isLast, onNextRound }) => {
+  const mapRef = useRef(null);
+  const [countdown, setCountdown] = useState(7);
+  const advancedRef = useRef(false);
+
+  const doNext = useCallback(() => {
+    if (advancedRef.current) return;
+    advancedRef.current = true;
+    onNextRound();
+  }, [onNextRound]);
+
+  useEffect(() => {
+    const id = setInterval(() => {
+      setCountdown(t => {
+        if (t <= 1) { clearInterval(id); doNext(); return 0; }
+        return t - 1;
+      });
+    }, 1000);
+    return () => clearInterval(id);
+  }, [doNext]);
+
+  useEffect(() => {
+    if (!mapRef.current) return;
+    const map = L.map(mapRef.current).setView([0, 0], 1);
+    L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png").addTo(map);
+
+    const bounds = [[rezultati.pravaLat, rezultati.pravaLng]];
+    const pravaIkona = L.divIcon({ html: '<div style="font-size:22px;line-height:1">📍</div>', iconSize: [22, 22], iconAnchor: [11, 22], className: "" });
+    L.marker([rezultati.pravaLat, rezultati.pravaLng], { icon: pravaIkona })
+      .addTo(map).bindPopup(`<b>Prava lokacija</b><br>${rezultati.regija || ""}`).openPopup();
+
+    const emojis = ["🔵", "🟢"];
+    rezultati.odgovori.forEach((o, i) => {
+      if (o.lat == null || o.lng == null) return;
+      const ik = L.divIcon({ html: `<div style="font-size:18px;line-height:1">${emojis[i] || "🟡"}</div>`, iconSize: [18, 18], iconAnchor: [9, 9], className: "" });
+      L.marker([o.lat, o.lng], { icon: ik }).addTo(map)
+        .bindPopup(`<b>${o.email.split("@")[0]}</b><br>${o.km} km · ${o.bod} bod.`);
+      L.polyline([[rezultati.pravaLat, rezultati.pravaLng], [o.lat, o.lng]], { color: i === 0 ? "#3b82f6" : "#22c55e", weight: 2, dashArray: "5,5", opacity: 0.8 }).addTo(map);
+      bounds.push([o.lat, o.lng]);
+    });
+
+    if (bounds.length > 1) map.fitBounds(L.latLngBounds(bounds).pad(0.3));
+    return () => map.remove();
+  }, []);
+
+  return (
+    <div className="flex flex-col h-full">
+      <div className="flex items-center justify-between px-5 py-3 border-b border-slate-800/60 shrink-0 bg-slate-900/50">
+        <h3 className="text-white font-semibold text-sm">Rezultati — Runda {rezultati.brojRunde}</h3>
+        {!isLast && <span className="text-slate-500 text-xs">Sljedeća za {countdown}s</span>}
+      </div>
+      <div ref={mapRef} className="flex-1" />
+      <div className="p-4 border-t border-slate-800/60 bg-slate-900/50 shrink-0">
+        <table className="w-full text-xs mb-3">
+          <thead><tr className="text-slate-500 border-b border-slate-800">
+            <th className="text-left pb-1.5">Igrač</th>
+            <th className="text-right pb-1.5">Udaljenost</th>
+            <th className="text-right pb-1.5">+ Bodovi</th>
+            <th className="text-right pb-1.5">Ukupno</th>
+          </tr></thead>
+          <tbody>
+            {rezultati.odgovori.map(o => (
+              <tr key={o.email} className="border-b border-slate-800/30">
+                <td className="py-1.5 text-slate-300">{o.email.split("@")[0]}</td>
+                <td className="py-1.5 text-right text-slate-400">{o.km} km</td>
+                <td className="py-1.5 text-right text-teal-400 font-medium">+{o.bod}</td>
+                <td className="py-1.5 text-right text-white font-bold">{rezultati.ukupnoBodova?.[o.email] ?? 0}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+        <button onClick={doNext}
+          className="w-full py-2 text-sm font-semibold bg-teal-500 hover:bg-teal-400 text-white rounded-xl transition-colors">
+          {isLast ? "Vidi konačne rezultate →" : `Sljedeća runda (${countdown}s)`}
+        </button>
+      </div>
+    </div>
+  );
+};
+
+const FinalResults = ({ final, korisnik, onClose, onPlayAgain }) => {
+  const myEmail   = korisnik.email_korisnika;
+  const iAmWinner = final.pobjednik === myEmail;
+  const igraci    = [final.igrac1, final.igrac2].filter(Boolean);
+
+  return (
+    <div className="flex flex-col items-center justify-center h-full p-8 text-center gap-6">
+      <div className="text-7xl">{iAmWinner ? "🏆" : "🌍"}</div>
+      <div>
+        <h2 className="text-white text-2xl font-bold mb-1">{iAmWinner ? "Pobijedio/la si!" : "Kraj igre"}</h2>
+        <p className="text-slate-400 text-sm">
+          {iAmWinner ? "Čestitamo! Imao/la si bolji njuh za lokacije." : `Pobijedio/la: ${final.pobjednik?.split("@")[0] ?? "?"}`}
+        </p>
+      </div>
+      <div className="w-full max-w-xs bg-slate-900 border border-slate-700/60 rounded-2xl overflow-hidden">
+        <p className="text-slate-500 text-xs font-semibold uppercase tracking-wide px-5 py-3 border-b border-slate-800">Konačni bodovi</p>
+        {igraci.map((igrac, i) => (
+          <div key={igrac.email} className={`flex items-center justify-between px-5 py-3 ${i < igraci.length - 1 ? "border-b border-slate-800/40" : ""}`}>
+            <span className={`text-sm flex items-center gap-2 ${igrac.email === myEmail ? "text-teal-400 font-medium" : "text-slate-300"}`}>
+              {final.pobjednik === igrac.email && <span>👑</span>}
+              {igrac.email.split("@")[0]}
+              {igrac.email === myEmail && " (ti)"}
+            </span>
+            <span className="text-white font-bold text-lg">{igrac.bodovi}</span>
+          </div>
+        ))}
+      </div>
+      <div className="flex gap-3">
+        <button onClick={onClose} className="px-6 py-2.5 text-sm font-medium text-slate-400 border border-slate-700 hover:border-slate-500 rounded-xl transition-all">Zatvori</button>
+        <button onClick={onPlayAgain} className="px-6 py-2.5 text-sm font-semibold bg-teal-500 hover:bg-teal-400 text-white rounded-xl transition-colors">Igraj ponovo</button>
+      </div>
+    </div>
+  );
+};
+
+const GeoGame = ({ game, korisnik, chatId, onClose, onPlayAgain, onNextRound }) => (
+  <div className="fixed inset-0 bg-slate-950 z-50 flex flex-col">
+    <div className="flex items-center justify-between px-5 py-3 bg-slate-900 border-b border-slate-800/60 shrink-0">
+      <div className="flex items-center gap-2">
+        <span className="text-base">🌍</span>
+        <span className="text-white font-semibold text-sm">Geo Igra</span>
+      </div>
+      <button onClick={onClose} className="text-slate-500 hover:text-slate-300 p-1 transition-colors"><XIcon /></button>
+    </div>
+    <div className="flex-1 overflow-hidden">
+      {game.faza === "lobby" && <GameLobby onCancel={onClose} />}
+      {game.faza === "playing" && game.trenutnaRundaData && (
+        <GameRound
+          key={game.trenutnaRundaData.broj_runde}
+          runda={game.trenutnaRundaData}
+          idBattle={game.id_battle}
+          chatId={chatId}
+          korisnik={korisnik}
+          ukupnoRundi={game.runde?.length ?? 5}
+        />
+      )}
+      {game.faza === "waiting_round" && (
+        <div className="flex items-center justify-center h-full gap-3 text-slate-500">
+          <SpinnerIcon /><span>Čekam sljedeću rundu...</span>
+        </div>
+      )}
+      {game.faza === "round_results" && game.rezultati && (
+        <RoundResults
+          key={`rr-${game.rezultati.brojRunde}`}
+          rezultati={game.rezultati}
+          isLast={game.rezultati.brojRunde >= (game.runde?.length ?? 5)}
+          onNextRound={onNextRound}
+        />
+      )}
+      {game.faza === "final_results" && game.final && (
+        <FinalResults final={game.final} korisnik={korisnik} onClose={onClose} onPlayAgain={onPlayAgain} />
+      )}
+    </div>
+  </div>
+);
+
 // ─── Chat formatters ─────────────────────────────────────────────────────────
 
 const formatTime = (ts) => {
@@ -765,14 +1088,14 @@ const formatTime = (ts) => {
   return d.toLocaleTimeString("hr-HR", { hour: "2-digit", minute: "2-digit" });
 };
 
-const ChatView = ({ chat, korisnik }) => {
+const ChatView = ({ chat, korisnik, gameInvite, onGameEvent, onStartGame }) => {
   const [messages, setMessages] = useState([]);
   const [loadingMsgs, setLoadingMsgs] = useState(true);
   const [inputText, setInputText] = useState("");
   const bottomRef = useRef(null);
   const inputRef = useRef(null);
 
-  // Join room and load history when chat changes
+  // Join room, load history, and register all socket listeners
   useEffect(() => {
     if (!chat) return;
 
@@ -795,9 +1118,30 @@ const ChatView = ({ chat, korisnik }) => {
     const handleNew = (msg) => setMessages((prev) => [...prev, msg]);
     socket.on("new_message", handleNew);
 
+    // Geo game socket events
+    const onGameInvite    = (d) => onGameEvent("invite",        d);
+    const onGameStarted   = (d) => onGameEvent("started",       d);
+    const onRoundStart    = (d) => onGameEvent("round_start",   d);
+    const onRoundResults  = (d) => onGameEvent("round_results", d);
+    const onGameEnded     = (d) => onGameEvent("ended",         d);
+    const onGameCancelled = (d) => onGameEvent("cancelled",     d);
+
+    socket.on("game_invite",    onGameInvite);
+    socket.on("game_started",   onGameStarted);
+    socket.on("round_start",    onRoundStart);
+    socket.on("round_results",  onRoundResults);
+    socket.on("game_ended",     onGameEnded);
+    socket.on("game_cancelled", onGameCancelled);
+
     return () => {
       socket.emit("leave_chat", { chatId: chat.id });
       socket.off("new_message", handleNew);
+      socket.off("game_invite",    onGameInvite);
+      socket.off("game_started",   onGameStarted);
+      socket.off("round_start",    onRoundStart);
+      socket.off("round_results",  onRoundResults);
+      socket.off("game_ended",     onGameEnded);
+      socket.off("game_cancelled", onGameCancelled);
     };
   }, [chat.id]);
 
@@ -840,7 +1184,7 @@ const ChatView = ({ chat, korisnik }) => {
       {/* Header */}
       <div className="flex items-center gap-3 px-5 py-4 border-b border-slate-800/60 shrink-0">
         <Avatar name={chat.name} />
-        <div>
+        <div className="flex-1">
           <h2 className="text-white font-semibold text-sm">{chat.name}</h2>
           <p className="text-xs text-slate-500">
             {chat.type === "group"
@@ -848,7 +1192,35 @@ const ChatView = ({ chat, korisnik }) => {
               : "Privatni razgovor"}
           </p>
         </div>
+        {chat.type === "individual" && (
+          <button
+            onClick={onStartGame}
+            title="Pokreni Geo Igru"
+            className="w-9 h-9 flex items-center justify-center rounded-xl text-slate-400 hover:text-teal-400 hover:bg-slate-800/60 transition-all text-lg"
+          >
+            🌍
+          </button>
+        )}
       </div>
+
+      {/* Geo game invite banner */}
+      {gameInvite && gameInvite.chatId === chat.id && (
+        <div className="mx-4 mt-3 shrink-0 bg-teal-500/10 border border-teal-500/20 rounded-xl p-3 flex items-center justify-between gap-3">
+          <span className="text-sm text-slate-300">
+            🌍 <b className="text-teal-400">{gameInvite.inviterEmail.split("@")[0]}</b> te poziva na Geo igru!
+          </span>
+          <div className="flex gap-2 shrink-0">
+            <button
+              onClick={() => onGameEvent("accept", gameInvite)}
+              className="px-3 py-1.5 text-xs font-semibold bg-teal-500 hover:bg-teal-400 text-white rounded-lg transition-colors"
+            >Prihvati</button>
+            <button
+              onClick={() => onGameEvent("decline", {})}
+              className="px-3 py-1.5 text-xs text-slate-400 hover:text-slate-200 border border-slate-700 rounded-lg transition-colors"
+            >Odbij</button>
+          </div>
+        </div>
+      )}
 
       {/* Message list */}
       <div className="flex-1 overflow-y-auto px-5 py-4 space-y-3">
@@ -928,6 +1300,66 @@ export default function ChatPage({ korisnik, onOdjava }) {
   const [searchQuery, setSearchQuery] = useState("");
   const [showNewChat, setShowNewChat] = useState(false);
   const [showNewGroup, setShowNewGroup] = useState(false);
+
+  // ── Geo igra ───────────────────────────────────────────────────────────────
+  const [activeGame, setActiveGame] = useState(null);
+  const [gameInvite, setGameInvite] = useState(null);
+
+  const handleGameEvent = useCallback((event, data) => {
+    switch (event) {
+      case "invite":
+        setGameInvite(data);
+        break;
+      case "accept":
+        setGameInvite(null);
+        setActiveGame({ id_battle: data.idBattle, faza: "lobby" });
+        socket.emit("accept_game", {
+          idBattle: data.idBattle,
+          prihvatioEmail: korisnik.email_korisnika,
+          chatId: data.chatId,
+        });
+        break;
+      case "decline":
+        setGameInvite(null);
+        break;
+      case "started":
+        setGameInvite(null);
+        setActiveGame(g => g
+          ? { ...g, ...data, faza: "playing" }
+          : { ...data, faza: "playing" });
+        break;
+      case "round_start":
+        setActiveGame(g => g ? { ...g, faza: "playing", trenutnaRundaData: data } : g);
+        break;
+      case "round_results":
+        setActiveGame(g => g ? { ...g, faza: "round_results", rezultati: data } : g);
+        break;
+      case "ended":
+        setActiveGame(g => g ? { ...g, faza: "final_results", final: data } : g);
+        break;
+      case "cancelled":
+        setActiveGame(null);
+        setGameInvite(null);
+        break;
+      default:
+        break;
+    }
+  }, [korisnik.email_korisnika]);
+
+  const handleStartGame = useCallback(async (chatId) => {
+    try {
+      const { id_battle, runde } = await startGeoGame(chatId);
+      setActiveGame({ id_battle, runde, faza: "lobby" });
+      socket.emit("invite_game", {
+        chatId,
+        idBattle: id_battle,
+        runde,
+        inviterEmail: korisnik.email_korisnika,
+      });
+    } catch (err) {
+      alert(err.message);
+    }
+  }, [korisnik.email_korisnika]);
 
   // ── Priče ──────────────────────────────────────────────────────────────────
   const [storyGroups, setStoryGroups] = useState([]);
@@ -1041,7 +1473,15 @@ export default function ChatPage({ korisnik, onOdjava }) {
       </aside>
 
       <main className="relative z-10 flex-1 flex flex-col bg-slate-950/50 backdrop-blur-sm">
-        {activeChat ? <ChatView chat={activeChat} korisnik={korisnik} /> : <EmptyState />}
+        {activeChat ? (
+          <ChatView
+            chat={activeChat}
+            korisnik={korisnik}
+            gameInvite={gameInvite}
+            onGameEvent={handleGameEvent}
+            onStartGame={() => handleStartGame(activeChat.id)}
+          />
+        ) : <EmptyState />}
       </main>
 
       {showNewChat && <NewChatModal onClose={() => setShowNewChat(false)} onCreate={handleChatCreated} />}
@@ -1059,6 +1499,22 @@ export default function ChatPage({ korisnik, onOdjava }) {
           startIndex={activeStoryGroup.startIdx}
           korisnik={korisnik}
           onClose={() => { setActiveStoryGroup(null); ucitajPrice(); }}
+        />
+      )}
+
+      {activeGame && (
+        <GeoGame
+          game={activeGame}
+          korisnik={korisnik}
+          chatId={activeChat?.id}
+          onClose={() => {
+            if (activeGame.id_battle && activeGame.faza !== "final_results") {
+              socket.emit("cancel_game", { idBattle: activeGame.id_battle, chatId: activeChat?.id });
+            }
+            setActiveGame(null);
+          }}
+          onPlayAgain={() => activeChat && handleStartGame(activeChat.id)}
+          onNextRound={() => setActiveGame(g => g ? { ...g, faza: "waiting_round" } : g)}
         />
       )}
     </div>

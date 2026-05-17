@@ -146,3 +146,36 @@ export async function kreirajGrupu({ naziv_grupe, clanovi = [] }) {
   if (!res.ok) throw new Error(data.error || 'Greška pri kreiranju grupe');
   return data;
 }
+
+// ─── Geo igra ────────────────────────────────────────────────────────────────
+
+export async function startGeoGame(chatId) {
+  const res = await fetch(`${API_BASE}/geo/start`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getAuthHeader() },
+    body: JSON.stringify({ chatId }),
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || 'Greška pri pokretanju igre');
+  return data; // { id_battle, runde }
+}
+
+export async function getGeoGame(idBattle) {
+  const res = await fetch(`${API_BASE}/geo/${idBattle}`, {
+    headers: { 'Content-Type': 'application/json', ...getAuthHeader() },
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || 'Greška pri dohvatu igre');
+  return data;
+}
+
+export async function submitGeoGuess(idBattle, brojRunde, lat, lng, pravaLat, pravaLng) {
+  const res = await fetch(`${API_BASE}/geo/${idBattle}/guess`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getAuthHeader() },
+    body: JSON.stringify({ broj_runde: brojRunde, lat, lng, prava_lat: pravaLat, prava_lng: pravaLng }),
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || 'Greška pri predaji pogađanja');
+  return data;
+}

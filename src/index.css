@@ -1,3 +1,13 @@
 @import "tailwindcss";
 @source "./**/*.{jsx,tsx,js,ts}";
 @source "./pages/**/*.{jsx,tsx}";
+
+/* Google Maps Street View renders in light mode regardless of app theme */
+.gm-style {
+  color-scheme: light;
+  filter: none !important;
+}
+.gm-style canvas,
+.gm-style img {
+  filter: none !important;
+}
