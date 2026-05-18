@@ -72,7 +72,7 @@ router.get('/chats', requireAuth, async (req, res) => {
 
         const drugiKorisnik = await Korisnik.findOne({
           where: { email_korisnika: drugiEmail },
-          attributes: ['email_korisnika', 'ime_korisnika', 'prezime_korisnika'],
+          attributes: ['email_korisnika', 'ime_korisnika', 'prezime_korisnika', 'slika_profila'],
         });
 
         return {
@@ -84,6 +84,7 @@ router.get('/chats', requireAuth, async (req, res) => {
           name: drugiKorisnik
             ? `${drugiKorisnik.ime_korisnika} ${drugiKorisnik.prezime_korisnika}`
             : drugiEmail,
+          slika_profila: drugiKorisnik?.slika_profila || null,
           datum_kreiranja: ir.datum_kreiranja,
         };
       })

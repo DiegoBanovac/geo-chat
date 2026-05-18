@@ -48,22 +48,26 @@ router.get('/messages', requireAuth, async (req, res) => {
     const emailSet = [...new Set(poruke.map((p) => p.posiljatelj_email))];
     const korisnici = await Korisnik.findAll({
       where: { email_korisnika: emailSet },
-      attributes: ['email_korisnika', 'ime_korisnika', 'prezime_korisnika'],
+      attributes: ['email_korisnika', 'ime_korisnika', 'prezime_korisnika', 'slika_profila'],
     });
     const korisnikMap = Object.fromEntries(
-      korisnici.map((k) => [k.email_korisnika, `${k.ime_korisnika} ${k.prezime_korisnika}`])
+      korisnici.map((k) => [k.email_korisnika, {
+        ime: `${k.ime_korisnika} ${k.prezime_korisnika}`,
+        slika_profila: k.slika_profila || null,
+      }])
     );
 
     const result = poruke.map((p) => ({
-      id_poruke:         p.id_poruke,
-      posiljatelj_email: p.posiljatelj_email,
-      posiljatelj_ime:   korisnikMap[p.posiljatelj_email] || p.posiljatelj_email,
-      naziv_grupe:       p.naziv_grupe,
-      primatelj_email:   p.primatelj_email,
-      vrijeme_slanja:    p.vrijeme_slanja,
-      poruka_tekst:      p.poruka_tekst,
-      tip_medija:        p.tip_medija,
-      poruka_medij_url:  p.poruka_medij_url,
+      id_poruke:            p.id_poruke,
+      posiljatelj_email:    p.posiljatelj_email,
+      posiljatelj_ime:      korisnikMap[p.posiljatelj_email]?.ime || p.posiljatelj_email,
+      posiljatelj_slika:    korisnikMap[p.posiljatelj_email]?.slika_profila || null,
+      naziv_grupe:          p.naziv_grupe,
+      primatelj_email:      p.primatelj_email,
+      vrijeme_slanja:       p.vrijeme_slanja,
+      poruka_tekst:         p.poruka_tekst,
+      tip_medija:           p.tip_medija,
+      poruka_medij_url:     p.poruka_medij_url,
     }));
 
     res.json(result);

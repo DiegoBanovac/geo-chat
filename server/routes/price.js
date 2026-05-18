@@ -83,7 +83,7 @@ router.get('/price', requireAuth, async (req, res) => {
     const emailSet = [...new Set(aktivne.map((p) => p.email_korisnika))];
     const korisnici = await Korisnik.findAll({
       where: { email_korisnika: emailSet },
-      attributes: ['email_korisnika', 'ime_korisnika', 'prezime_korisnika'],
+      attributes: ['email_korisnika', 'ime_korisnika', 'prezime_korisnika', 'slika_profila'],
     });
     const korisnikMap = Object.fromEntries(
       korisnici.map((k) => [k.email_korisnika, k])
@@ -103,11 +103,12 @@ router.get('/price', requireAuth, async (req, res) => {
         const k = korisnikMap[p.email_korisnika];
         grouped[p.email_korisnika] = {
           email_korisnika: p.email_korisnika,
-          ime:     k?.ime_korisnika     || '',
-          prezime: k?.prezime_korisnika || '',
-          isMine:  p.email_korisnika === myEmail,
-          hasUnviewed: false,
-          price: [],
+          ime:             k?.ime_korisnika     || '',
+          prezime:         k?.prezime_korisnika || '',
+          slika_profila:   k?.slika_profila     || null,
+          isMine:          p.email_korisnika === myEmail,
+          hasUnviewed:     false,
+          price:           [],
         };
       }
       const viewed = viewedSet.has(p.id_price);

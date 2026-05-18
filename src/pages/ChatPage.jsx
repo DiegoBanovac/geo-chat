@@ -13,11 +13,13 @@ import {
   startGeoGame,
 } from "../lib/supabase";
 import socket from "../lib/socket";
+import DnevniIzazov from "./DnevniIzazov";
 
 // Fix Leaflet default marker icons for Vite bundler
 delete L.Icon.Default.prototype._getIconUrl;
 L.Icon.Default.mergeOptions({
-  iconRetinaUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png",
+  iconRetinaUrl:
+    "https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png",
   iconUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png",
   shadowUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png",
 });
@@ -25,14 +27,21 @@ L.Icon.Default.mergeOptions({
 // Load Google Maps script exactly once for the lifetime of the page
 let _mapsPromise = null;
 function loadGoogleMaps(apiKey) {
-  if (window.google?.maps?.StreetViewPanorama) return Promise.resolve(window.google.maps);
+  if (window.google?.maps?.StreetViewPanorama)
+    return Promise.resolve(window.google.maps);
   if (_mapsPromise) return _mapsPromise;
   _mapsPromise = new Promise((resolve, reject) => {
-    window.__gmCb = () => { delete window.__gmCb; resolve(window.google.maps); };
+    window.__gmCb = () => {
+      delete window.__gmCb;
+      resolve(window.google.maps);
+    };
     const s = document.createElement("script");
     s.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}&callback=__gmCb&v=weekly&libraries=streetView`;
     s.async = true;
-    s.onerror = () => { _mapsPromise = null; reject(new Error("Google Maps failed to load")); };
+    s.onerror = () => {
+      _mapsPromise = null;
+      reject(new Error("Google Maps failed to load"));
+    };
     document.head.appendChild(s);
   });
   return _mapsPromise;
@@ -40,10 +49,18 @@ function loadGoogleMaps(apiKey) {
 
 const MapGridBackground = () => (
   <div className="absolute inset-0 overflow-hidden pointer-events-none">
-    <svg className="absolute inset-0 w-full h-full opacity-[0.04]" xmlns="http://www.w3.org/2000/svg">
+    <svg
+      className="absolute inset-0 w-full h-full opacity-[0.04]"
+      xmlns="http://www.w3.org/2000/svg"
+    >
       <defs>
         <pattern id="grid" width="48" height="48" patternUnits="userSpaceOnUse">
-          <path d="M 48 0 L 0 0 0 48" fill="none" stroke="#14b8a6" strokeWidth="0.5" />
+          <path
+            d="M 48 0 L 0 0 0 48"
+            fill="none"
+            stroke="#14b8a6"
+            strokeWidth="0.5"
+          />
         </pattern>
       </defs>
       <rect width="100%" height="100%" fill="url(#grid)" />
@@ -54,50 +71,138 @@ const MapGridBackground = () => (
 );
 
 const GeoIcon = () => (
-  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <circle cx="12" cy="12" r="10" /><line x1="2" y1="12" x2="22" y2="12" />
+  <svg
+    width="20"
+    height="20"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+  >
+    <circle cx="12" cy="12" r="10" />
+    <line x1="2" y1="12" x2="22" y2="12" />
     <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z" />
   </svg>
 );
 const SearchIcon = () => (
-  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" />
+  <svg
+    width="15"
+    height="15"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+  >
+    <circle cx="11" cy="11" r="8" />
+    <line x1="21" y1="21" x2="16.65" y2="16.65" />
   </svg>
 );
 const PlusIcon = () => (
-  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-    <line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" />
+  <svg
+    width="15"
+    height="15"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2.5"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+  >
+    <line x1="12" y1="5" x2="12" y2="19" />
+    <line x1="5" y1="12" x2="19" y2="12" />
   </svg>
 );
 const UsersIcon = () => (
-  <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-    <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" />
-    <path d="M23 21v-2a4 4 0 0 0-3-3.87" /><path d="M16 3.13a4 4 0 0 1 0 7.75" />
+  <svg
+    width="17"
+    height="17"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="1.8"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+  >
+    <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
+    <circle cx="9" cy="7" r="4" />
+    <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
+    <path d="M16 3.13a4 4 0 0 1 0 7.75" />
   </svg>
 );
 const UserIcon = () => (
-  <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-    <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" /><circle cx="12" cy="7" r="4" />
+  <svg
+    width="17"
+    height="17"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="1.8"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+  >
+    <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
+    <circle cx="12" cy="7" r="4" />
   </svg>
 );
 const XIcon = () => (
-  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-    <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
+  <svg
+    width="14"
+    height="14"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2.5"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+  >
+    <line x1="18" y1="6" x2="6" y2="18" />
+    <line x1="6" y1="6" x2="18" y2="18" />
   </svg>
 );
 const ChatBubbleIcon = () => (
-  <svg width="44" height="44" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1" strokeLinecap="round" strokeLinejoin="round">
+  <svg
+    width="44"
+    height="44"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="1"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+  >
     <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
   </svg>
 );
 const SpinnerIcon = () => (
-  <svg className="animate-spin" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+  <svg
+    className="animate-spin"
+    width="16"
+    height="16"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+  >
     <path d="M21 12a9 9 0 1 1-6.219-8.56" />
   </svg>
 );
 const SendIcon = () => (
-  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <line x1="22" y1="2" x2="11" y2="13" /><polygon points="22 2 15 22 11 13 2 9 22 2" />
+  <svg
+    width="18"
+    height="18"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+  >
+    <line x1="22" y1="2" x2="11" y2="13" />
+    <polygon points="22 2 15 22 11 13 2 9 22 2" />
   </svg>
 );
 const PinIcon = () => (
@@ -106,40 +211,79 @@ const PinIcon = () => (
   </svg>
 );
 const ImageIcon = () => (
-  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-    <rect x="3" y="3" width="18" height="18" rx="2" /><circle cx="8.5" cy="8.5" r="1.5" />
+  <svg
+    width="24"
+    height="24"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="1.5"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+  >
+    <rect x="3" y="3" width="18" height="18" rx="2" />
+    <circle cx="8.5" cy="8.5" r="1.5" />
     <polyline points="21 15 16 10 5 21" />
   </svg>
 );
 const ChevronLeftIcon = () => (
-  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+  <svg
+    width="20"
+    height="20"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2.5"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+  >
     <polyline points="15 18 9 12 15 6" />
   </svg>
 );
 const ChevronRightIcon = () => (
-  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+  <svg
+    width="20"
+    height="20"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2.5"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+  >
     <polyline points="9 18 15 12 9 6" />
   </svg>
 );
 
 const AVATAR_COLORS = [
-  "bg-teal-600", "bg-cyan-600", "bg-blue-600",
-  "bg-violet-600", "bg-emerald-600", "bg-sky-600",
+  "bg-teal-600",
+  "bg-cyan-600",
+  "bg-blue-600",
+  "bg-violet-600",
+  "bg-emerald-600",
+  "bg-sky-600",
 ];
 const getInitials = (name = "") => {
   const p = name.trim().split(" ");
-  return p.length >= 2 ? (p[0][0] + p[1][0]).toUpperCase() : name.slice(0, 2).toUpperCase();
+  return p.length >= 2
+    ? (p[0][0] + p[1][0]).toUpperCase()
+    : name.slice(0, 2).toUpperCase();
 };
 const getAvatarColor = (name = "") => {
   let h = 0;
   for (let i = 0; i < name.length; i++) h = name.charCodeAt(i) + ((h << 5) - h);
   return AVATAR_COLORS[Math.abs(h) % AVATAR_COLORS.length];
 };
-const Avatar = ({ name = "", size = "md" }) => {
+const Avatar = ({ name = "", size = "md", avatarUrl = null }) => {
   const sz = size === "sm" ? "w-9 h-9 text-xs" : "w-11 h-11 text-sm";
   return (
-    <div className={`${sz} ${getAvatarColor(name)} rounded-full flex items-center justify-center font-semibold text-white shrink-0`}>
-      {getInitials(name)}
+    <div
+      className={`${sz} ${getAvatarColor(name)} rounded-full flex items-center justify-center font-semibold text-white shrink-0 overflow-hidden`}
+    >
+      {avatarUrl
+        ? <img src={`http://localhost:3001${avatarUrl}`} alt={name} className="w-full h-full object-cover" />
+        : getInitials(name)
+      }
     </div>
   );
 };
@@ -153,23 +297,35 @@ const KorisnikSearch = ({ placeholder, onSelect, excludeEmails = [] }) => {
   const wrapRef = useRef(null);
 
   useEffect(() => {
-    if (query.trim().length < 2) { setRezultati([]); setOpen(false); return; }
+    if (query.trim().length < 2) {
+      setRezultati([]);
+      setOpen(false);
+      return;
+    }
     clearTimeout(timerRef.current);
     timerRef.current = setTimeout(async () => {
       setLoading(true);
       try {
         const res = await pretraziKorisnike(query);
-        const filtered = res.filter((k) => !excludeEmails.includes(k.email_korisnika));
+        const filtered = res.filter(
+          (k) => !excludeEmails.includes(k.email_korisnika),
+        );
         setRezultati(filtered);
         setOpen(true);
-      } catch { setRezultati([]); }
-      finally { setLoading(false); }
+      } catch {
+        setRezultati([]);
+      } finally {
+        setLoading(false);
+      }
     }, 300);
     return () => clearTimeout(timerRef.current);
   }, [query]);
 
   useEffect(() => {
-    const handler = (e) => { if (wrapRef.current && !wrapRef.current.contains(e.target)) setOpen(false); };
+    const handler = (e) => {
+      if (wrapRef.current && !wrapRef.current.contains(e.target))
+        setOpen(false);
+    };
     document.addEventListener("mousedown", handler);
     return () => document.removeEventListener("mousedown", handler);
   }, []);
@@ -203,9 +359,14 @@ const KorisnikSearch = ({ placeholder, onSelect, excludeEmails = [] }) => {
               onMouseDown={() => handleSelect(k)}
               className="w-full flex items-center gap-3 px-3 py-2.5 hover:bg-slate-800/80 transition-colors text-left"
             >
-              <Avatar name={`${k.ime_korisnika} ${k.prezime_korisnika}`} size="sm" />
+              <Avatar
+                name={`${k.ime_korisnika} ${k.prezime_korisnika}`}
+                size="sm"
+              />
               <div>
-                <p className="text-sm text-slate-200 font-medium">{k.ime_korisnika} {k.prezime_korisnika}</p>
+                <p className="text-sm text-slate-200 font-medium">
+                  {k.ime_korisnika} {k.prezime_korisnika}
+                </p>
                 <p className="text-xs text-slate-500">{k.email_korisnika}</p>
               </div>
             </button>
@@ -214,7 +375,9 @@ const KorisnikSearch = ({ placeholder, onSelect, excludeEmails = [] }) => {
       )}
       {open && query.length >= 2 && rezultati.length === 0 && !loading && (
         <div className="absolute top-full mt-1.5 left-0 right-0 bg-slate-900 border border-slate-700/60 rounded-xl shadow-2xl z-50">
-          <p className="text-xs text-slate-500 px-4 py-3 text-center">Nema korisnika za "{query}"</p>
+          <p className="text-xs text-slate-500 px-4 py-3 text-center">
+            Nema korisnika za "{query}"
+          </p>
         </div>
       )}
     </div>
@@ -246,36 +409,75 @@ const NewChatModal = ({ onClose, onCreate }) => {
       <div className="bg-slate-900 border border-slate-700/60 rounded-2xl p-6 w-full max-w-sm shadow-2xl">
         <div className="flex items-center justify-between mb-5">
           <div>
-            <h2 className="text-white font-semibold text-base">Novi razgovor</h2>
-            <p className="text-slate-500 text-xs mt-0.5">Pretraži i odaberi korisnika</p>
+            <h2 className="text-white font-semibold text-base">
+              Novi razgovor
+            </h2>
+            <p className="text-slate-500 text-xs mt-0.5">
+              Pretraži i odaberi korisnika
+            </p>
           </div>
-          <button onClick={onClose} className="text-slate-500 hover:text-slate-300 transition-colors p-1"><XIcon /></button>
+          <button
+            onClick={onClose}
+            className="text-slate-500 hover:text-slate-300 transition-colors p-1"
+          >
+            <XIcon />
+          </button>
         </div>
         {error && (
-          <div className="mb-4 bg-red-500/10 border border-red-500/20 text-red-400 text-xs rounded-xl px-3 py-2">{error}</div>
+          <div className="mb-4 bg-red-500/10 border border-red-500/20 text-red-400 text-xs rounded-xl px-3 py-2">
+            {error}
+          </div>
         )}
         <div className="mb-5">
-          <label className="block text-sm font-medium text-slate-400 mb-1.5">Traži korisnika</label>
-          <KorisnikSearch placeholder="Pretraži po imenu ili emailu..." onSelect={(k) => setOdabrani(k)} />
+          <label className="block text-sm font-medium text-slate-400 mb-1.5">
+            Traži korisnika
+          </label>
+          <KorisnikSearch
+            placeholder="Pretraži po imenu ili emailu..."
+            onSelect={(k) => setOdabrani(k)}
+          />
         </div>
         {odabrani && (
           <div className="mb-5 flex items-center gap-3 bg-teal-500/10 border border-teal-500/20 rounded-xl px-3 py-2.5">
-            <Avatar name={`${odabrani.ime_korisnika} ${odabrani.prezime_korisnika}`} size="sm" />
+            <Avatar
+              name={`${odabrani.ime_korisnika} ${odabrani.prezime_korisnika}`}
+              size="sm"
+            />
             <div className="flex-1 min-w-0">
-              <p className="text-sm text-teal-300 font-medium">{odabrani.ime_korisnika} {odabrani.prezime_korisnika}</p>
-              <p className="text-xs text-slate-500 truncate">{odabrani.email_korisnika}</p>
+              <p className="text-sm text-teal-300 font-medium">
+                {odabrani.ime_korisnika} {odabrani.prezime_korisnika}
+              </p>
+              <p className="text-xs text-slate-500 truncate">
+                {odabrani.email_korisnika}
+              </p>
             </div>
-            <button onClick={() => setOdabrani(null)} className="text-slate-500 hover:text-slate-300"><XIcon /></button>
+            <button
+              onClick={() => setOdabrani(null)}
+              className="text-slate-500 hover:text-slate-300"
+            >
+              <XIcon />
+            </button>
           </div>
         )}
         <div className="flex gap-2">
-          <button onClick={onClose} className="flex-1 py-2.5 text-sm font-medium text-slate-400 hover:text-slate-200 border border-slate-700 hover:border-slate-600 rounded-xl transition-all">Odustani</button>
+          <button
+            onClick={onClose}
+            className="flex-1 py-2.5 text-sm font-medium text-slate-400 hover:text-slate-200 border border-slate-700 hover:border-slate-600 rounded-xl transition-all"
+          >
+            Odustani
+          </button>
           <button
             onClick={handleCreate}
             disabled={!odabrani || loading}
             className="flex-1 py-2.5 text-sm font-semibold bg-teal-500 hover:bg-teal-400 disabled:opacity-40 disabled:cursor-not-allowed text-white rounded-xl transition-colors flex items-center justify-center gap-2"
           >
-            {loading ? <><SpinnerIcon /> Kreiram...</> : "Započni chat"}
+            {loading ? (
+              <>
+                <SpinnerIcon /> Kreiram...
+              </>
+            ) : (
+              "Započni chat"
+            )}
           </button>
         </div>
       </div>
@@ -293,14 +495,18 @@ const NewGroupModal = ({ onClose, onCreate }) => {
     if (clanovi.some((c) => c.email_korisnika === k.email_korisnika)) return;
     setClanovi([...clanovi, k]);
   };
-  const removeClan = (email) => setClanovi(clanovi.filter((c) => c.email_korisnika !== email));
+  const removeClan = (email) =>
+    setClanovi(clanovi.filter((c) => c.email_korisnika !== email));
 
   const handleCreate = async () => {
     if (!naziv.trim()) return;
     setLoading(true);
     setError("");
     try {
-      const grupa = await kreirajGrupu({ naziv_grupe: naziv.trim(), clanovi: clanovi.map((c) => c.email_korisnika) });
+      const grupa = await kreirajGrupu({
+        naziv_grupe: naziv.trim(),
+        clanovi: clanovi.map((c) => c.email_korisnika),
+      });
       onCreate(grupa);
       onClose();
     } catch (err) {
@@ -316,23 +522,39 @@ const NewGroupModal = ({ onClose, onCreate }) => {
         <div className="flex items-center justify-between mb-5">
           <div>
             <h2 className="text-white font-semibold text-base">Nova grupa</h2>
-            <p className="text-slate-500 text-xs mt-0.5">Kreiraj grupni razgovor</p>
+            <p className="text-slate-500 text-xs mt-0.5">
+              Kreiraj grupni razgovor
+            </p>
           </div>
-          <button onClick={onClose} className="text-slate-500 hover:text-slate-300 transition-colors p-1"><XIcon /></button>
+          <button
+            onClick={onClose}
+            className="text-slate-500 hover:text-slate-300 transition-colors p-1"
+          >
+            <XIcon />
+          </button>
         </div>
         {error && (
-          <div className="mb-4 bg-red-500/10 border border-red-500/20 text-red-400 text-xs rounded-xl px-3 py-2">{error}</div>
+          <div className="mb-4 bg-red-500/10 border border-red-500/20 text-red-400 text-xs rounded-xl px-3 py-2">
+            {error}
+          </div>
         )}
         <div className="mb-4">
-          <label className="block text-sm font-medium text-slate-400 mb-1.5">Naziv grupe</label>
+          <label className="block text-sm font-medium text-slate-400 mb-1.5">
+            Naziv grupe
+          </label>
           <input
-            type="text" value={naziv} onChange={(e) => setNaziv(e.target.value)}
-            placeholder="npr. GeoMasters" autoFocus
+            type="text"
+            value={naziv}
+            onChange={(e) => setNaziv(e.target.value)}
+            placeholder="npr. GeoMasters"
+            autoFocus
             className="w-full bg-slate-800/60 border border-slate-700/60 rounded-xl px-4 py-2.5 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-teal-500/70 focus:bg-slate-800 transition-all"
           />
         </div>
         <div className="mb-4">
-          <label className="block text-sm font-medium text-slate-400 mb-1.5">Dodaj članove</label>
+          <label className="block text-sm font-medium text-slate-400 mb-1.5">
+            Dodaj članove
+          </label>
           <KorisnikSearch
             placeholder="Pretraži po imenu ili emailu..."
             onSelect={addClan}
@@ -342,24 +564,48 @@ const NewGroupModal = ({ onClose, onCreate }) => {
         {clanovi.length > 0 && (
           <div className="mb-4 space-y-1.5 max-h-32 overflow-y-auto">
             {clanovi.map((c) => (
-              <div key={c.email_korisnika} className="flex items-center gap-2.5 bg-slate-800/50 border border-slate-700/40 rounded-lg px-3 py-1.5">
-                <Avatar name={`${c.ime_korisnika} ${c.prezime_korisnika}`} size="sm" />
+              <div
+                key={c.email_korisnika}
+                className="flex items-center gap-2.5 bg-slate-800/50 border border-slate-700/40 rounded-lg px-3 py-1.5"
+              >
+                <Avatar
+                  name={`${c.ime_korisnika} ${c.prezime_korisnika}`}
+                  size="sm"
+                />
                 <div className="flex-1 min-w-0">
-                  <p className="text-xs text-slate-300 font-medium truncate">{c.ime_korisnika} {c.prezime_korisnika}</p>
+                  <p className="text-xs text-slate-300 font-medium truncate">
+                    {c.ime_korisnika} {c.prezime_korisnika}
+                  </p>
                 </div>
-                <button onClick={() => removeClan(c.email_korisnika)} className="text-slate-500 hover:text-red-400 transition-colors shrink-0"><XIcon /></button>
+                <button
+                  onClick={() => removeClan(c.email_korisnika)}
+                  className="text-slate-500 hover:text-red-400 transition-colors shrink-0"
+                >
+                  <XIcon />
+                </button>
               </div>
             ))}
           </div>
         )}
         <div className="flex gap-2 mt-1">
-          <button onClick={onClose} className="flex-1 py-2.5 text-sm font-medium text-slate-400 hover:text-slate-200 border border-slate-700 hover:border-slate-600 rounded-xl transition-all">Odustani</button>
+          <button
+            onClick={onClose}
+            className="flex-1 py-2.5 text-sm font-medium text-slate-400 hover:text-slate-200 border border-slate-700 hover:border-slate-600 rounded-xl transition-all"
+          >
+            Odustani
+          </button>
           <button
             onClick={handleCreate}
             disabled={!naziv.trim() || loading}
             className="flex-1 py-2.5 text-sm font-semibold bg-teal-500 hover:bg-teal-400 disabled:opacity-40 disabled:cursor-not-allowed text-white rounded-xl transition-colors flex items-center justify-center gap-2"
           >
-            {loading ? <><SpinnerIcon /> Kreiram...</> : "Kreiraj grupu"}
+            {loading ? (
+              <>
+                <SpinnerIcon /> Kreiram...
+              </>
+            ) : (
+              "Kreiraj grupu"
+            )}
           </button>
         </div>
       </div>
@@ -370,16 +616,27 @@ const NewGroupModal = ({ onClose, onCreate }) => {
 const ChatItem = ({ chat, isActive, onClick }) => (
   <button
     onClick={() => onClick(chat)}
-    className={`w-full flex items-center gap-3 px-3 py-3 rounded-xl transition-all text-left group ${isActive ? "bg-teal-500/10 border border-teal-500/20" : "hover:bg-slate-800/60 border border-transparent"
-      }`}
+    className={`w-full flex items-center gap-3 px-3 py-3 rounded-xl transition-all text-left group ${
+      isActive
+        ? "bg-teal-500/10 border border-teal-500/20"
+        : "hover:bg-slate-800/60 border border-transparent"
+    }`}
   >
-    <Avatar name={chat.name} />
+    <Avatar name={chat.name} avatarUrl={chat.slika_profila} />
     <div className="flex-1 min-w-0">
       <div className="flex items-center justify-between mb-0.5">
-        <span className={`font-medium text-sm truncate ${isActive ? "text-teal-400" : "text-slate-200"}`}>{chat.name}</span>
-        <span className="text-[10px] text-slate-600 shrink-0 ml-2">{chat.type === "group" ? `${chat.memberCount} čl.` : ""}</span>
+        <span
+          className={`font-medium text-sm truncate ${isActive ? "text-teal-400" : "text-slate-200"}`}
+        >
+          {chat.name}
+        </span>
+        <span className="text-[10px] text-slate-600 shrink-0 ml-2">
+          {chat.type === "group" ? `${chat.memberCount} čl.` : ""}
+        </span>
       </div>
-      <p className="text-xs text-slate-500 truncate">{chat.type === "group" ? "Grupni razgovor" : "Privatni razgovor"}</p>
+      <p className="text-xs text-slate-500 truncate">
+        {chat.type === "group" ? "Grupni razgovor" : "Privatni razgovor"}
+      </p>
     </div>
   </button>
 );
@@ -389,7 +646,10 @@ const SidebarHeader = ({ onNewChat, onNewGroup }) => {
   const menuRef = useRef(null);
 
   useEffect(() => {
-    const handler = (e) => { if (menuRef.current && !menuRef.current.contains(e.target)) setMenuOpen(false); };
+    const handler = (e) => {
+      if (menuRef.current && !menuRef.current.contains(e.target))
+        setMenuOpen(false);
+    };
     document.addEventListener("mousedown", handler);
     return () => document.removeEventListener("mousedown", handler);
   }, []);
@@ -399,19 +659,36 @@ const SidebarHeader = ({ onNewChat, onNewGroup }) => {
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2 text-teal-400">
           <GeoIcon />
-          <span className="font-bold text-white tracking-tight text-base">GeoChat</span>
+          <span className="font-bold text-white tracking-tight text-base">
+            GeoChat
+          </span>
         </div>
         <div ref={menuRef} className="relative">
-          <button onClick={() => setMenuOpen(!menuOpen)} className="w-8 h-8 flex items-center justify-center rounded-lg text-slate-400 hover:text-teal-400 hover:bg-slate-800/60 transition-all">
+          <button
+            onClick={() => setMenuOpen(!menuOpen)}
+            className="w-8 h-8 flex items-center justify-center rounded-lg text-slate-400 hover:text-teal-400 hover:bg-slate-800/60 transition-all"
+          >
             <PlusIcon />
           </button>
           {menuOpen && (
             <div className="absolute right-0 top-10 w-48 bg-slate-900 border border-slate-700/60 rounded-xl shadow-2xl overflow-hidden z-20">
-              <button onClick={() => { onNewChat(); setMenuOpen(false); }} className="w-full flex items-center gap-3 px-4 py-3 text-sm text-slate-300 hover:bg-slate-800/80 hover:text-teal-400 transition-all">
+              <button
+                onClick={() => {
+                  onNewChat();
+                  setMenuOpen(false);
+                }}
+                className="w-full flex items-center gap-3 px-4 py-3 text-sm text-slate-300 hover:bg-slate-800/80 hover:text-teal-400 transition-all"
+              >
                 <UserIcon /> Novi razgovor
               </button>
               <div className="mx-3 border-t border-slate-800" />
-              <button onClick={() => { onNewGroup(); setMenuOpen(false); }} className="w-full flex items-center gap-3 px-4 py-3 text-sm text-slate-300 hover:bg-slate-800/80 hover:text-teal-400 transition-all">
+              <button
+                onClick={() => {
+                  onNewGroup();
+                  setMenuOpen(false);
+                }}
+                className="w-full flex items-center gap-3 px-4 py-3 text-sm text-slate-300 hover:bg-slate-800/80 hover:text-teal-400 transition-all"
+              >
                 <UsersIcon /> Nova grupa
               </button>
             </div>
@@ -426,13 +703,19 @@ const Tabs = ({ active, onChange, counts }) => (
   <div className="flex gap-1 px-4 pt-3 pb-2">
     {["Svi", "Privatni", "Grupe"].map((tab) => (
       <button
-        key={tab} onClick={() => onChange(tab)}
-        className={`flex-1 py-1.5 text-xs font-medium rounded-lg transition-all flex items-center justify-center gap-1.5 ${active === tab ? "bg-teal-500/15 text-teal-400 border border-teal-500/20" : "text-slate-500 hover:text-slate-300"
-          }`}
+        key={tab}
+        onClick={() => onChange(tab)}
+        className={`flex-1 py-1.5 text-xs font-medium rounded-lg transition-all flex items-center justify-center gap-1.5 ${
+          active === tab
+            ? "bg-teal-500/15 text-teal-400 border border-teal-500/20"
+            : "text-slate-500 hover:text-slate-300"
+        }`}
       >
         {tab}
         {counts[tab] > 0 && (
-          <span className={`text-[9px] px-1 rounded-full ${active === tab ? "bg-teal-500/30" : "bg-slate-700"}`}>
+          <span
+            className={`text-[9px] px-1 rounded-full ${active === tab ? "bg-teal-500/30" : "bg-slate-700"}`}
+          >
             {counts[tab]}
           </span>
         )}
@@ -444,9 +727,13 @@ const Tabs = ({ active, onChange, counts }) => (
 const ChatSearch = ({ value, onChange }) => (
   <div className="px-4 pb-3">
     <div className="relative">
-      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500"><SearchIcon /></span>
+      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500">
+        <SearchIcon />
+      </span>
       <input
-        type="text" value={value} onChange={(e) => onChange(e.target.value)}
+        type="text"
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
         placeholder="Pretraži razgovore..."
         className="w-full bg-slate-800/60 border border-slate-700/60 rounded-xl pl-9 pr-4 py-2 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-teal-500/50 transition-all"
       />
@@ -456,14 +743,18 @@ const ChatSearch = ({ value, onChange }) => (
 const ProfileEditModal = ({ korisnik, onClose, onSave }) => {
   const [ime, setIme] = useState(korisnik.ime_korisnika);
   const [prezime, setPrezime] = useState(korisnik.prezime_korisnika);
-  const [datumRodenja, setDatumRodenja] = useState(korisnik.datum_rodenja?.slice(0, 10) || "");
+  const [datumRodenja, setDatumRodenja] = useState(
+    korisnik.datum_rodenja?.slice(0, 10) || "",
+  );
   const [novaLozinka, setNovaLozinka] = useState("");
   const [potvrda, setPotvrda] = useState("");
   const [greska, setGreska] = useState(null);
   const [saving, setSaving] = useState(false);
   const [avatarFile, setAvatarFile] = useState(null);
   const [avatarPreview, setAvatarPreview] = useState(
-    korisnik.slika_profila ? `http://localhost:3001${korisnik.slika_profila}` : null
+    korisnik.slika_profila
+      ? `http://localhost:3001${korisnik.slika_profila}`
+      : null,
   );
   const avatarInputRef = useRef(null);
 
@@ -476,20 +767,34 @@ const ProfileEditModal = ({ korisnik, onClose, onSave }) => {
 
   const handleSave = async () => {
     if (!ime.trim() || !prezime.trim()) {
-      setGreska("Ime i prezime su obavezni."); return;
+      setGreska("Ime i prezime su obavezni.");
+      return;
     }
     if (novaLozinka && novaLozinka !== potvrda) {
-      setGreska("Lozinke se ne podudaraju."); return;
+      setGreska("Lozinke se ne podudaraju.");
+      return;
     }
 
     setSaving(true);
     setGreska(null);
 
     try {
-      const body = {
-        ime_korisnika: ime.trim(),
-        prezime_korisnika: prezime.trim(),
-      };
+      // 1. Ako je odabrana nova slika, uploadaj je zasebno
+      if (avatarFile) {
+        const fd = new FormData();
+        fd.append("slika_profila", avatarFile);
+        const avatarRes = await fetch(
+          `http://localhost:3001/api/korisnici/${encodeURIComponent(korisnik.email_korisnika)}/avatar`,
+          { method: "POST", headers: { "X-User-Email": korisnik.email_korisnika }, body: fd },
+        );
+        if (!avatarRes.ok) {
+          const d = await avatarRes.json();
+          throw new Error(d.error || "Greška pri uploadu slike");
+        }
+      }
+
+      // 2. Ažuriraj tekst polja kao JSON
+      const body = { ime_korisnika: ime.trim(), prezime_korisnika: prezime.trim() };
       if (datumRodenja) body.datum_rodenja = datumRodenja;
       if (novaLozinka) body.lozinka_korisnika = novaLozinka;
 
@@ -497,14 +802,14 @@ const ProfileEditModal = ({ korisnik, onClose, onSave }) => {
         `http://localhost:3001/api/korisnici/${encodeURIComponent(korisnik.email_korisnika)}`,
         {
           method: "PUT",
-          headers: {
-            "Content-Type": "application/json",
-            "X-User-Email": korisnik.email_korisnika,
-          },
+          headers: { "Content-Type": "application/json", "X-User-Email": korisnik.email_korisnika },
           body: JSON.stringify(body),
-        }
+        },
       );
-      if (!res.ok) { const d = await res.json(); throw new Error(d.error || "Greška"); }
+      if (!res.ok) {
+        const d = await res.json();
+        throw new Error(d.error || "Greška");
+      }
       const updated = await res.json();
       onSave(updated);
     } catch (e) {
@@ -521,15 +826,18 @@ const ProfileEditModal = ({ korisnik, onClose, onSave }) => {
       onClick={(e) => e.target === e.currentTarget && onClose()}
     >
       <div className="bg-slate-900 border border-slate-700/60 rounded-2xl w-full max-w-sm mx-4 overflow-hidden">
-
         {/* Header */}
         <div className="flex items-center justify-between px-5 py-4 border-b border-slate-800/60">
           <h2 className="text-white font-semibold text-sm">Uredi profil</h2>
-          <button onClick={onClose} className="text-slate-500 hover:text-slate-200 transition-colors">✕</button>
+          <button
+            onClick={onClose}
+            className="text-slate-500 hover:text-slate-200 transition-colors"
+          >
+            ✕
+          </button>
         </div>
 
         <div className="px-5 py-4 space-y-4">
-
           {/* Avatar */}
           <div className="flex flex-col items-center gap-2">
             <button
@@ -543,7 +851,9 @@ const ProfileEditModal = ({ korisnik, onClose, onSave }) => {
                   className="w-16 h-16 rounded-full object-cover ring-2 ring-slate-700 group-hover:ring-teal-500/50 transition-all"
                 />
               ) : (
-                <div className={`w-16 h-16 rounded-full ${getAvatarColor(name)} flex items-center justify-center text-white text-lg font-bold ring-2 ring-slate-700 group-hover:ring-teal-500/50 transition-all`}>
+                <div
+                  className={`w-16 h-16 rounded-full ${getAvatarColor(name)} flex items-center justify-center text-white text-lg font-bold ring-2 ring-slate-700 group-hover:ring-teal-500/50 transition-all`}
+                >
                   {getInitials(name)}
                 </div>
               )}
@@ -551,7 +861,13 @@ const ProfileEditModal = ({ korisnik, onClose, onSave }) => {
                 <span className="text-white text-xs">Promijeni</span>
               </div>
             </button>
-            <input type="file" accept="image/*" ref={avatarInputRef} onChange={handleAvatarSelect} className="hidden" />
+            <input
+              type="file"
+              accept="image/*"
+              ref={avatarInputRef}
+              onChange={handleAvatarSelect}
+              className="hidden"
+            />
             <p className="text-xs text-slate-500">Klikni za promjenu slike</p>
           </div>
 
@@ -567,7 +883,9 @@ const ProfileEditModal = ({ korisnik, onClose, onSave }) => {
               />
             </div>
             <div>
-              <label className="text-xs text-slate-500 mb-1 block">Prezime</label>
+              <label className="text-xs text-slate-500 mb-1 block">
+                Prezime
+              </label>
               <input
                 type="text"
                 value={prezime}
@@ -579,7 +897,9 @@ const ProfileEditModal = ({ korisnik, onClose, onSave }) => {
 
           {/* Datum rodenja */}
           <div>
-            <label className="text-xs text-slate-500 mb-1 block">Datum rođenja</label>
+            <label className="text-xs text-slate-500 mb-1 block">
+              Datum rođenja
+            </label>
             <input
               type="date"
               value={datumRodenja}
@@ -590,7 +910,9 @@ const ProfileEditModal = ({ korisnik, onClose, onSave }) => {
 
           {/* Nova lozinka */}
           <div>
-            <label className="text-xs text-slate-500 mb-1 block">Nova lozinka <span className="text-slate-600">(opcionalno)</span></label>
+            <label className="text-xs text-slate-500 mb-1 block">
+              Nova lozinka <span className="text-slate-600">(opcionalno)</span>
+            </label>
             <input
               type="password"
               value={novaLozinka}
@@ -602,7 +924,9 @@ const ProfileEditModal = ({ korisnik, onClose, onSave }) => {
 
           {novaLozinka && (
             <div>
-              <label className="text-xs text-slate-500 mb-1 block">Potvrdi lozinku</label>
+              <label className="text-xs text-slate-500 mb-1 block">
+                Potvrdi lozinku
+              </label>
               <input
                 type="password"
                 value={potvrda}
@@ -614,7 +938,9 @@ const ProfileEditModal = ({ korisnik, onClose, onSave }) => {
           )}
 
           {greska && (
-            <p className="text-xs text-rose-400 bg-rose-500/10 border border-rose-500/20 rounded-xl px-3 py-2">{greska}</p>
+            <p className="text-xs text-rose-400 bg-rose-500/10 border border-rose-500/20 rounded-xl px-3 py-2">
+              {greska}
+            </p>
           )}
         </div>
 
@@ -649,13 +975,18 @@ const ProfileFooter = ({ korisnik, onOdjava, onKorisnikUpdate }) => {
       <div className="px-4 py-3 border-t border-slate-800/60 flex items-center gap-3">
         <button
           onClick={() => setShowEdit(true)}
-          className={`w-8 h-8 rounded-full ${getAvatarColor(name)} flex items-center justify-center text-white text-xs font-bold shrink-0 hover:ring-2 hover:ring-teal-500/50 transition-all`}
+          className={`w-8 h-8 rounded-full ${getAvatarColor(name)} flex items-center justify-center text-white text-xs font-bold shrink-0 hover:ring-2 hover:ring-teal-500/50 transition-all overflow-hidden`}
         >
-          {getInitials(name)}
+          {korisnik.slika_profila
+            ? <img src={`http://localhost:3001${korisnik.slika_profila}`} alt={name} className="w-full h-full object-cover" />
+            : getInitials(name)
+          }
         </button>
         <div className="flex-1 min-w-0">
           <p className="text-sm font-medium text-slate-200 truncate">{name}</p>
-          <p className="text-xs text-slate-600 truncate">{korisnik.email_korisnika}</p>
+          <p className="text-xs text-slate-600 truncate">
+            {korisnik.email_korisnika}
+          </p>
         </div>
         <button
           onClick={onOdjava}
@@ -669,7 +1000,10 @@ const ProfileFooter = ({ korisnik, onOdjava, onKorisnikUpdate }) => {
         <ProfileEditModal
           korisnik={korisnik}
           onClose={() => setShowEdit(false)}
-          onSave={(updated) => { onKorisnikUpdate(updated); setShowEdit(false); }}
+          onSave={(updated) => {
+            onKorisnikUpdate(updated);
+            setShowEdit(false);
+          }}
         />
       )}
     </>
@@ -681,8 +1015,12 @@ const EmptyState = () => (
       <div className="inline-flex items-center justify-center w-20 h-20 rounded-2xl bg-teal-500/5 border border-teal-500/10 text-teal-500/30 mb-4">
         <ChatBubbleIcon />
       </div>
-      <h3 className="text-slate-400 font-medium text-sm mb-1">Odaberi razgovor</h3>
-      <p className="text-slate-600 text-xs">Klikni na chat s lijeve strane da ga otvoriš</p>
+      <h3 className="text-slate-400 font-medium text-sm mb-1">
+        Odaberi razgovor
+      </h3>
+      <p className="text-slate-600 text-xs">
+        Klikni na chat s lijeve strane da ga otvoriš
+      </p>
     </div>
   </div>
 );
@@ -718,7 +1056,10 @@ const StoryUploadModal = ({ onClose, onUploaded }) => {
     setLoading(true);
     setError("");
     try {
-      const nova = await uploadPricu({ file, lokacija_naziv: location.trim() || null });
+      const nova = await uploadPricu({
+        file,
+        lokacija_naziv: location.trim() || null,
+      });
       onUploaded(nova);
     } catch (err) {
       setError(err.message);
@@ -733,9 +1074,14 @@ const StoryUploadModal = ({ onClose, onUploaded }) => {
         <div className="flex items-center justify-between mb-5">
           <div>
             <h2 className="text-white font-semibold text-base">Nova priča</h2>
-            <p className="text-slate-500 text-xs mt-0.5">Briše se automatski za 24 sata</p>
+            <p className="text-slate-500 text-xs mt-0.5">
+              Briše se automatski za 24 sata
+            </p>
           </div>
-          <button onClick={onClose} className="text-slate-500 hover:text-slate-300 p-1 transition-colors">
+          <button
+            onClick={onClose}
+            className="text-slate-500 hover:text-slate-300 p-1 transition-colors"
+          >
             <XIcon />
           </button>
         </div>
@@ -754,23 +1100,38 @@ const StoryUploadModal = ({ onClose, onUploaded }) => {
           className="mb-4 h-52 rounded-xl overflow-hidden border-2 border-dashed border-slate-700 hover:border-teal-500/60 transition-colors cursor-pointer flex items-center justify-center bg-slate-800/40"
         >
           {preview ? (
-            <img src={preview} className="w-full h-full object-cover" alt="preview" />
+            <img
+              src={preview}
+              className="w-full h-full object-cover"
+              alt="preview"
+            />
           ) : (
             <div className="text-center select-none">
               <div className="inline-flex items-center justify-center w-12 h-12 rounded-xl bg-slate-700/60 text-slate-400 mb-3">
                 <ImageIcon />
               </div>
-              <p className="text-slate-400 text-sm font-medium">Klikni ili prevuci sliku</p>
-              <p className="text-slate-600 text-xs mt-1">JPG, PNG, GIF, WebP · max 10 MB</p>
+              <p className="text-slate-400 text-sm font-medium">
+                Klikni ili prevuci sliku
+              </p>
+              <p className="text-slate-600 text-xs mt-1">
+                JPG, PNG, GIF, WebP · max 10 MB
+              </p>
             </div>
           )}
         </div>
-        <input ref={fileRef} type="file" accept="image/*" onChange={handleFile} className="hidden" />
+        <input
+          ref={fileRef}
+          type="file"
+          accept="image/*"
+          onChange={handleFile}
+          className="hidden"
+        />
 
         {/* Location */}
         <div className="mb-5">
           <label className="flex items-center gap-1.5 text-sm font-medium text-slate-400 mb-1.5">
-            <PinIcon /> Lokacija <span className="text-slate-600 font-normal">(opcionalno)</span>
+            <PinIcon /> Lokacija{" "}
+            <span className="text-slate-600 font-normal">(opcionalno)</span>
           </label>
           <input
             type="text"
@@ -793,7 +1154,13 @@ const StoryUploadModal = ({ onClose, onUploaded }) => {
             disabled={!file || loading}
             className="flex-1 py-2.5 text-sm font-semibold bg-teal-500 hover:bg-teal-400 disabled:opacity-40 disabled:cursor-not-allowed text-white rounded-xl transition-colors flex items-center justify-center gap-2"
           >
-            {loading ? <><SpinnerIcon /> Objavljujem...</> : "Objavi priču"}
+            {loading ? (
+              <>
+                <SpinnerIcon /> Objavljujem...
+              </>
+            ) : (
+              "Objavi priču"
+            )}
           </button>
         </div>
       </div>
@@ -819,7 +1186,7 @@ const StoryViewer = ({ group, startIndex, korisnik, onClose }) => {
 
   useEffect(() => {
     if (story && !group.isMine && !story.viewed) {
-      oznaciBrojPriče(story.id_price).catch(() => { });
+      oznaciBrojPriče(story.id_price).catch(() => {});
     }
   }, [story?.id_price]);
 
@@ -854,7 +1221,10 @@ const StoryViewer = ({ group, startIndex, korisnik, onClose }) => {
         {/* Progress bars */}
         <div className="absolute top-0 left-0 right-0 flex gap-1 p-3 z-10">
           {group.price.map((_, i) => (
-            <div key={i} className="h-0.5 flex-1 rounded-full bg-white/20 overflow-hidden">
+            <div
+              key={i}
+              className="h-0.5 flex-1 rounded-full bg-white/20 overflow-hidden"
+            >
               <div
                 className={`h-full rounded-full transition-all ${i < currentIdx ? "bg-white w-full" : i === currentIdx ? "bg-white w-full" : "w-0"}`}
               />
@@ -864,12 +1234,18 @@ const StoryViewer = ({ group, startIndex, korisnik, onClose }) => {
 
         {/* Header */}
         <div className="absolute top-6 left-0 right-0 flex items-center gap-2.5 px-3 z-10">
-          <div className={`w-8 h-8 rounded-full ${getAvatarColor(name)} flex items-center justify-center text-white text-xs font-bold shrink-0`}>
+          <div
+            className={`w-8 h-8 rounded-full ${getAvatarColor(name)} flex items-center justify-center text-white text-xs font-bold shrink-0`}
+          >
             {getInitials(name)}
           </div>
           <div className="flex-1 min-w-0">
-            <p className="text-white text-sm font-semibold leading-none">{name}</p>
-            <p className="text-white/50 text-xs mt-0.5">{timeAgo(story.vrijeme_objave)}</p>
+            <p className="text-white text-sm font-semibold leading-none">
+              {name}
+            </p>
+            <p className="text-white/50 text-xs mt-0.5">
+              {timeAgo(story.vrijeme_objave)}
+            </p>
           </div>
           <button
             onClick={onClose}
@@ -899,7 +1275,10 @@ const StoryViewer = ({ group, startIndex, korisnik, onClose }) => {
 
           {/* Navigation — left zone */}
           <button
-            onClick={(e) => { e.stopPropagation(); goPrev(); }}
+            onClick={(e) => {
+              e.stopPropagation();
+              goPrev();
+            }}
             className={`absolute left-0 top-0 w-1/4 h-full flex items-center justify-start pl-2 ${currentIdx === 0 ? "opacity-0 pointer-events-none" : "opacity-100"}`}
             aria-label="Prethodna"
           >
@@ -910,7 +1289,10 @@ const StoryViewer = ({ group, startIndex, korisnik, onClose }) => {
 
           {/* Navigation — right zone */}
           <button
-            onClick={(e) => { e.stopPropagation(); goNext(); }}
+            onClick={(e) => {
+              e.stopPropagation();
+              goNext();
+            }}
             className="absolute right-0 top-0 w-1/4 h-full flex items-center justify-end pr-2"
             aria-label="Sljedeća"
           >
@@ -926,19 +1308,39 @@ const StoryViewer = ({ group, startIndex, korisnik, onClose }) => {
 
 // ─── Stories: StoriesStrip ───────────────────────────────────────────────────
 
-const StoryBubble = ({ label, hasUnviewed, isMine, noStory, onClick, avatarUrl }) => (
-  <div className="flex flex-col items-center gap-1 shrink-0 cursor-pointer" onClick={onClick}>
-    <div className={`p-0.5 rounded-full ${hasUnviewed ? "bg-linear-to-tr from-teal-500 to-cyan-400" : isMine && !noStory ? "bg-linear-to-tr from-teal-500 to-cyan-400" : "bg-slate-700"}`}>
+const StoryBubble = ({
+  label,
+  hasUnviewed,
+  isMine,
+  noStory,
+  onClick,
+  avatarUrl,
+}) => (
+  <div
+    className="flex flex-col items-center gap-1 shrink-0 cursor-pointer"
+    onClick={onClick}
+  >
+    <div
+      className={`p-0.5 rounded-full ${hasUnviewed ? "bg-linear-to-tr from-teal-500 to-cyan-400" : isMine && !noStory ? "bg-linear-to-tr from-teal-500 to-cyan-400" : "bg-slate-700"}`}
+    >
       <div className="p-0.5 bg-slate-900 rounded-full">
-        <div className={`w-10 h-10 rounded-full ${getAvatarColor(label)} flex items-center justify-center text-white text-xs font-bold relative overflow-hidden`}>
+        <div
+          className={`w-10 h-10 rounded-full ${getAvatarColor(label)} flex items-center justify-center text-white text-xs font-bold relative overflow-hidden`}
+        >
           {avatarUrl ? (
-            <img src={avatarUrl} alt={label} className="w-full h-full object-cover rounded-full" />
+            <img
+              src={avatarUrl}
+              alt={label}
+              className="w-full h-full object-cover rounded-full"
+            />
           ) : (
             getInitials(label)
           )}
           {noStory && (
             <div className="absolute -bottom-0.5 -right-0.5 w-4 h-4 bg-teal-500 rounded-full flex items-center justify-center border-2 border-slate-900">
-              <span className="text-white text-[9px] font-bold leading-none">+</span>
+              <span className="text-white text-[9px] font-bold leading-none">
+                +
+              </span>
             </div>
           )}
         </div>
@@ -956,13 +1358,15 @@ const StoriesStrip = ({ korisnik, storyGroups, onOpenStory, onAddStory }) => {
   const others = storyGroups.filter((g) => !g.isMine);
   console.log("korisnik.slika_profila:", korisnik.slika_profila);
 
-
   return (
     <div className="px-3 pt-3 pb-2 border-b border-slate-800/60">
       <p className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider mb-2.5 px-0.5">
         Priče
       </p>
-      <div className="flex gap-3 overflow-x-auto pb-1" style={{ scrollbarWidth: "none" }}>
+      <div
+        className="flex gap-3 overflow-x-auto pb-1"
+        style={{ scrollbarWidth: "none" }}
+      >
         {/* Moja priča / dodaj */}
         <StoryBubble
           label={myName}
@@ -970,9 +1374,11 @@ const StoriesStrip = ({ korisnik, storyGroups, onOpenStory, onAddStory }) => {
           isMine={true}
           noStory={!myGroup}
           onClick={() => (myGroup ? onOpenStory(myGroup, 0) : onAddStory())}
-          avatarUrl={korisnik.slika_profila && korisnik.slika_profila !== ""
-            ? `http://localhost:3001${korisnik.slika_profila}`
-            : null}
+          avatarUrl={
+            korisnik.slika_profila && korisnik.slika_profila !== ""
+              ? `http://localhost:3001${korisnik.slika_profila}`
+              : null
+          }
         />
         {others.map((group) => (
           <StoryBubble
@@ -982,11 +1388,17 @@ const StoriesStrip = ({ korisnik, storyGroups, onOpenStory, onAddStory }) => {
             isMine={false}
             noStory={false}
             onClick={() => onOpenStory(group, 0)}
-            avatarUrl={group.slika_profila ? `http://localhost:3001${group.slika_profila}` : null}
+            avatarUrl={
+              group.slika_profila
+                ? `http://localhost:3001${group.slika_profila}`
+                : null
+            }
           />
         ))}
         {storyGroups.length === 0 && (
-          <p className="text-xs text-slate-600 py-1 px-1">Nema aktivnih priča</p>
+          <p className="text-xs text-slate-600 py-1 px-1">
+            Nema aktivnih priča
+          </p>
         )}
       </div>
     </div>
@@ -999,14 +1411,21 @@ const GameLobby = ({ onCancel }) => (
   <div className="flex flex-col items-center justify-center h-full gap-6 p-8 text-center">
     <div className="text-7xl">🌍</div>
     <div>
-      <h2 className="text-white text-xl font-bold mb-2">Čekanje na protivnika</h2>
-      <p className="text-slate-400 text-sm">Pozivnica je poslana. Čekam prihvaćanje...</p>
+      <h2 className="text-white text-xl font-bold mb-2">
+        Čekanje na protivnika
+      </h2>
+      <p className="text-slate-400 text-sm">
+        Pozivnica je poslana. Čekam prihvaćanje...
+      </p>
     </div>
     <div className="flex items-center gap-2 text-slate-500 text-sm">
-      <SpinnerIcon /><span className="ml-1">Čekam odgovor...</span>
+      <SpinnerIcon />
+      <span className="ml-1">Čekam odgovor...</span>
     </div>
-    <button onClick={onCancel}
-      className="px-6 py-2.5 text-sm font-medium text-slate-400 border border-slate-700 hover:border-slate-500 hover:text-slate-200 rounded-xl transition-all">
+    <button
+      onClick={onCancel}
+      className="px-6 py-2.5 text-sm font-medium text-slate-400 border border-slate-700 hover:border-slate-500 hover:text-slate-200 rounded-xl transition-all"
+    >
       Odustani
     </button>
   </div>
@@ -1041,8 +1460,12 @@ const GameRound = ({ runda, idBattle, chatId, korisnik, ukupnoRundi }) => {
   useEffect(() => {
     const submit = () => doSubmit();
     const id = setInterval(() => {
-      setTimeLeft(t => {
-        if (t <= 1) { clearInterval(id); submit(); return 0; }
+      setTimeLeft((t) => {
+        if (t <= 1) {
+          clearInterval(id);
+          submit();
+          return 0;
+        }
         return t - 1;
       });
     }, 1000);
@@ -1052,11 +1475,15 @@ const GameRound = ({ runda, idBattle, chatId, korisnik, ukupnoRundi }) => {
   // Leaflet guess map
   useEffect(() => {
     if (!mapRef.current) return;
-    const map = L.map(mapRef.current, { zoomControl: true }).setView([20, 0], 2);
+    const map = L.map(mapRef.current, { zoomControl: true }).setView(
+      [20, 0],
+      2,
+    );
     L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
-      attribution: "© OpenStreetMap", maxZoom: 18,
+      attribution: "© OpenStreetMap",
+      maxZoom: 18,
     }).addTo(map);
-    map.on("click", e => {
+    map.on("click", (e) => {
       guessRef.current = { lat: e.latlng.lat, lng: e.latlng.lng };
       setGuessSet(true);
       if (markerRef.current) markerRef.current.remove();
@@ -1072,49 +1499,86 @@ const GameRound = ({ runda, idBattle, chatId, korisnik, ukupnoRundi }) => {
     if (!apiKey || apiKey.startsWith("OVDJE_")) return;
     let timeoutId;
     let cancelled = false;
-    loadGoogleMaps(apiKey).then(maps => {
-      if (cancelled || !svRef.current) return;
-      const pano = new maps.StreetViewPanorama(svRef.current, {
-        ...(runda.pano_id ? { pano: runda.pano_id } : { position: { lat: runda.lat, lng: runda.lng } }),
-        addressControl: false,
-        showRoadLabels: false,
-        fullscreenControl: false,
-        motionTracking: false,
-        motionTrackingControl: false,
-        zoomControl: false,
+    loadGoogleMaps(apiKey)
+      .then((maps) => {
+        if (cancelled || !svRef.current) return;
+        const pano = new maps.StreetViewPanorama(svRef.current, {
+          ...(runda.pano_id
+            ? { pano: runda.pano_id }
+            : { position: { lat: runda.lat, lng: runda.lng } }),
+          addressControl: false,
+          showRoadLabels: false,
+          fullscreenControl: false,
+          motionTracking: false,
+          motionTrackingControl: false,
+          zoomControl: false,
+        });
+        timeoutId = setTimeout(() => {
+          if (!cancelled) setNoImagery(true);
+        }, 10000);
+        pano.addListener("tiles_loaded", () => clearTimeout(timeoutId));
+      })
+      .catch(() => {
+        if (!cancelled) setNoImagery(true);
       });
-      timeoutId = setTimeout(() => { if (!cancelled) setNoImagery(true); }, 10000);
-      pano.addListener("tiles_loaded", () => clearTimeout(timeoutId));
-    }).catch(() => { if (!cancelled) setNoImagery(true); });
-    return () => { cancelled = true; clearTimeout(timeoutId); };
+    return () => {
+      cancelled = true;
+      clearTimeout(timeoutId);
+    };
   }, [runda.lat, runda.lng]);
 
-  const timerColor = timeLeft > 20 ? "text-teal-400" : timeLeft > 10 ? "text-yellow-400" : "text-red-400";
-  const hasKey = import.meta.env.VITE_GOOGLE_MAPS_KEY && !import.meta.env.VITE_GOOGLE_MAPS_KEY.startsWith("OVDJE_");
+  const timerColor =
+    timeLeft > 20
+      ? "text-teal-400"
+      : timeLeft > 10
+        ? "text-yellow-400"
+        : "text-red-400";
+  const hasKey =
+    import.meta.env.VITE_GOOGLE_MAPS_KEY &&
+    !import.meta.env.VITE_GOOGLE_MAPS_KEY.startsWith("OVDJE_");
 
   return (
     <div className="flex flex-col h-full">
       <div className="flex items-center justify-between px-5 py-3 border-b border-slate-800/60 shrink-0 bg-slate-900/50">
-        <span className="text-slate-400 text-sm">Runda {runda.broj_runde} / {ukupnoRundi}</span>
-        <span className={`font-mono font-bold text-xl ${timerColor}`}>{timeLeft}s</span>
+        <span className="text-slate-400 text-sm">
+          Runda {runda.broj_runde} / {ukupnoRundi}
+        </span>
+        <span className={`font-mono font-bold text-xl ${timerColor}`}>
+          {timeLeft}s
+        </span>
         <div className="w-24" />
       </div>
       <div className="flex flex-1 overflow-hidden">
         {/* Street View */}
-        <div className="w-[60%] shrink-0 relative" style={{ colorScheme: 'light', isolation: 'isolate' }}>
-          <div ref={svRef} className="w-full h-full bg-slate-900" style={{ colorScheme: 'light' }} />
+        <div
+          className="w-[60%] shrink-0 relative"
+          style={{ colorScheme: "light", isolation: "isolate" }}
+        >
+          <div
+            ref={svRef}
+            className="w-full h-full bg-slate-900"
+            style={{ colorScheme: "light" }}
+          />
           {!hasKey && (
             <div className="absolute inset-0 flex flex-col items-center justify-center bg-slate-900/95 text-center p-6">
               <p className="text-5xl mb-4">🗺️</p>
-              <p className="text-slate-300 font-medium text-sm mb-1">Google Maps API ključ nije postavljen</p>
-              <p className="text-slate-500 text-xs">Dodaj VITE_GOOGLE_MAPS_KEY u .env</p>
+              <p className="text-slate-300 font-medium text-sm mb-1">
+                Google Maps API ključ nije postavljen
+              </p>
+              <p className="text-slate-500 text-xs">
+                Dodaj VITE_GOOGLE_MAPS_KEY u .env
+              </p>
             </div>
           )}
           {hasKey && noImagery && (
             <div className="absolute inset-0 flex flex-col items-center justify-center bg-slate-900/95 text-center p-6">
               <p className="text-5xl mb-4">📷</p>
-              <p className="text-slate-300 font-medium text-sm">Snimka nije dostupna za ovu lokaciju</p>
-              <p className="text-slate-500 text-xs mt-1">Pokušaj pogoditi na temelju koordinata</p>
+              <p className="text-slate-300 font-medium text-sm">
+                Snimka nije dostupna za ovu lokaciju
+              </p>
+              <p className="text-slate-500 text-xs mt-1">
+                Pokušaj pogoditi na temelju koordinata
+              </p>
             </div>
           )}
         </div>
@@ -1122,9 +1586,16 @@ const GameRound = ({ runda, idBattle, chatId, korisnik, ukupnoRundi }) => {
         <div className="flex-1 flex flex-col border-l border-slate-800/60">
           <div ref={mapRef} className="flex-1" />
           <div className="p-3 border-t border-slate-800/60 bg-slate-900/50 shrink-0">
-            <button onClick={doSubmit} disabled={!guessSet || submitted}
-              className="w-full py-2.5 text-sm font-semibold bg-teal-500 hover:bg-teal-400 disabled:opacity-40 disabled:cursor-not-allowed text-white rounded-xl transition-colors">
-              {submitted ? "✓ Predano! Čekam protivnika..." : guessSet ? "Predaj pogađanje" : "Klikni na karti za označiti lokaciju"}
+            <button
+              onClick={doSubmit}
+              disabled={!guessSet || submitted}
+              className="w-full py-2.5 text-sm font-semibold bg-teal-500 hover:bg-teal-400 disabled:opacity-40 disabled:cursor-not-allowed text-white rounded-xl transition-colors"
+            >
+              {submitted
+                ? "✓ Predano! Čekam protivnika..."
+                : guessSet
+                  ? "Predaj pogađanje"
+                  : "Klikni na karti za označiti lokaciju"}
             </button>
           </div>
         </div>
@@ -1146,8 +1617,12 @@ const RoundResults = ({ rezultati, isLast, onNextRound }) => {
 
   useEffect(() => {
     const id = setInterval(() => {
-      setCountdown(t => {
-        if (t <= 1) { clearInterval(id); doNext(); return 0; }
+      setCountdown((t) => {
+        if (t <= 1) {
+          clearInterval(id);
+          doNext();
+          return 0;
+        }
         return t - 1;
       });
     }, 1000);
@@ -1157,20 +1632,48 @@ const RoundResults = ({ rezultati, isLast, onNextRound }) => {
   useEffect(() => {
     if (!mapRef.current) return;
     const map = L.map(mapRef.current).setView([0, 0], 1);
-    L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png").addTo(map);
+    L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png").addTo(
+      map,
+    );
 
     const bounds = [[rezultati.pravaLat, rezultati.pravaLng]];
-    const pravaIkona = L.divIcon({ html: '<div style="font-size:22px;line-height:1">📍</div>', iconSize: [22, 22], iconAnchor: [11, 22], className: "" });
+    const pravaIkona = L.divIcon({
+      html: '<div style="font-size:22px;line-height:1">📍</div>',
+      iconSize: [22, 22],
+      iconAnchor: [11, 22],
+      className: "",
+    });
     L.marker([rezultati.pravaLat, rezultati.pravaLng], { icon: pravaIkona })
-      .addTo(map).bindPopup(`<b>Prava lokacija</b><br>${rezultati.regija || ""}`).openPopup();
+      .addTo(map)
+      .bindPopup(`<b>Prava lokacija</b><br>${rezultati.regija || ""}`)
+      .openPopup();
 
     const emojis = ["🔵", "🟢"];
     rezultati.odgovori.forEach((o, i) => {
       if (o.lat == null || o.lng == null) return;
-      const ik = L.divIcon({ html: `<div style="font-size:18px;line-height:1">${emojis[i] || "🟡"}</div>`, iconSize: [18, 18], iconAnchor: [9, 9], className: "" });
-      L.marker([o.lat, o.lng], { icon: ik }).addTo(map)
-        .bindPopup(`<b>${o.email.split("@")[0]}</b><br>${o.km} km · ${o.bod} bod.`);
-      L.polyline([[rezultati.pravaLat, rezultati.pravaLng], [o.lat, o.lng]], { color: i === 0 ? "#3b82f6" : "#22c55e", weight: 2, dashArray: "5,5", opacity: 0.8 }).addTo(map);
+      const ik = L.divIcon({
+        html: `<div style="font-size:18px;line-height:1">${emojis[i] || "🟡"}</div>`,
+        iconSize: [18, 18],
+        iconAnchor: [9, 9],
+        className: "",
+      });
+      L.marker([o.lat, o.lng], { icon: ik })
+        .addTo(map)
+        .bindPopup(
+          `<b>${o.email.split("@")[0]}</b><br>${o.km} km · ${o.bod} bod.`,
+        );
+      L.polyline(
+        [
+          [rezultati.pravaLat, rezultati.pravaLng],
+          [o.lat, o.lng],
+        ],
+        {
+          color: i === 0 ? "#3b82f6" : "#22c55e",
+          weight: 2,
+          dashArray: "5,5",
+          opacity: 0.8,
+        },
+      ).addTo(map);
       bounds.push([o.lat, o.lng]);
     });
 
@@ -1181,32 +1684,50 @@ const RoundResults = ({ rezultati, isLast, onNextRound }) => {
   return (
     <div className="flex flex-col h-full">
       <div className="flex items-center justify-between px-5 py-3 border-b border-slate-800/60 shrink-0 bg-slate-900/50">
-        <h3 className="text-white font-semibold text-sm">Rezultati — Runda {rezultati.brojRunde}</h3>
-        {!isLast && <span className="text-slate-500 text-xs">Sljedeća za {countdown}s</span>}
+        <h3 className="text-white font-semibold text-sm">
+          Rezultati — Runda {rezultati.brojRunde}
+        </h3>
+        {!isLast && (
+          <span className="text-slate-500 text-xs">
+            Sljedeća za {countdown}s
+          </span>
+        )}
       </div>
       <div ref={mapRef} className="flex-1" />
       <div className="p-4 border-t border-slate-800/60 bg-slate-900/50 shrink-0">
         <table className="w-full text-xs mb-3">
-          <thead><tr className="text-slate-500 border-b border-slate-800">
-            <th className="text-left pb-1.5">Igrač</th>
-            <th className="text-right pb-1.5">Udaljenost</th>
-            <th className="text-right pb-1.5">+ Bodovi</th>
-            <th className="text-right pb-1.5">Ukupno</th>
-          </tr></thead>
+          <thead>
+            <tr className="text-slate-500 border-b border-slate-800">
+              <th className="text-left pb-1.5">Igrač</th>
+              <th className="text-right pb-1.5">Udaljenost</th>
+              <th className="text-right pb-1.5">+ Bodovi</th>
+              <th className="text-right pb-1.5">Ukupno</th>
+            </tr>
+          </thead>
           <tbody>
-            {rezultati.odgovori.map(o => (
+            {rezultati.odgovori.map((o) => (
               <tr key={o.email} className="border-b border-slate-800/30">
-                <td className="py-1.5 text-slate-300">{o.email.split("@")[0]}</td>
+                <td className="py-1.5 text-slate-300">
+                  {o.email.split("@")[0]}
+                </td>
                 <td className="py-1.5 text-right text-slate-400">{o.km} km</td>
-                <td className="py-1.5 text-right text-teal-400 font-medium">+{o.bod}</td>
-                <td className="py-1.5 text-right text-white font-bold">{rezultati.ukupnoBodova?.[o.email] ?? 0}</td>
+                <td className="py-1.5 text-right text-teal-400 font-medium">
+                  +{o.bod}
+                </td>
+                <td className="py-1.5 text-right text-white font-bold">
+                  {rezultati.ukupnoBodova?.[o.email] ?? 0}
+                </td>
               </tr>
             ))}
           </tbody>
         </table>
-        <button onClick={doNext}
-          className="w-full py-2 text-sm font-semibold bg-teal-500 hover:bg-teal-400 text-white rounded-xl transition-colors">
-          {isLast ? "Vidi konačne rezultate →" : `Sljedeća runda (${countdown}s)`}
+        <button
+          onClick={doNext}
+          className="w-full py-2 text-sm font-semibold bg-teal-500 hover:bg-teal-400 text-white rounded-xl transition-colors"
+        >
+          {isLast
+            ? "Vidi konačne rezultate →"
+            : `Sljedeća runda (${countdown}s)`}
         </button>
       </div>
     </div>
@@ -1222,16 +1743,27 @@ const FinalResults = ({ final, korisnik, onClose, onPlayAgain }) => {
     <div className="flex flex-col items-center justify-center h-full p-8 text-center gap-6">
       <div className="text-7xl">{iAmWinner ? "🏆" : "🌍"}</div>
       <div>
-        <h2 className="text-white text-2xl font-bold mb-1">{iAmWinner ? "Pobijedio/la si!" : "Kraj igre"}</h2>
+        <h2 className="text-white text-2xl font-bold mb-1">
+          {iAmWinner ? "Pobijedio/la si!" : "Kraj igre"}
+        </h2>
         <p className="text-slate-400 text-sm">
-          {iAmWinner ? "Čestitamo! Imao/la si bolji njuh za lokacije." : `Pobijedio/la: ${final.pobjednik?.split("@")[0] ?? "?"}`}
+          {iAmWinner
+            ? "Čestitamo! Imao/la si bolji njuh za lokacije."
+            : `Pobijedio/la: ${final.pobjednik?.split("@")[0] ?? "?"}`}
         </p>
       </div>
       <div className="w-full max-w-xs bg-slate-900 border border-slate-700/60 rounded-2xl overflow-hidden">
-        <p className="text-slate-500 text-xs font-semibold uppercase tracking-wide px-5 py-3 border-b border-slate-800">Konačni bodovi</p>
+        <p className="text-slate-500 text-xs font-semibold uppercase tracking-wide px-5 py-3 border-b border-slate-800">
+          Konačni bodovi
+        </p>
         {igraci.map((igrac, i) => (
-          <div key={igrac.email} className={`flex items-center justify-between px-5 py-3 ${i < igraci.length - 1 ? "border-b border-slate-800/40" : ""}`}>
-            <span className={`text-sm flex items-center gap-2 ${igrac.email === myEmail ? "text-teal-400 font-medium" : "text-slate-300"}`}>
+          <div
+            key={igrac.email}
+            className={`flex items-center justify-between px-5 py-3 ${i < igraci.length - 1 ? "border-b border-slate-800/40" : ""}`}
+          >
+            <span
+              className={`text-sm flex items-center gap-2 ${igrac.email === myEmail ? "text-teal-400 font-medium" : "text-slate-300"}`}
+            >
               {final.pobjednik === igrac.email && <span>👑</span>}
               {igrac.email.split("@")[0]}
               {igrac.email === myEmail && " (ti)"}
@@ -1241,21 +1773,43 @@ const FinalResults = ({ final, korisnik, onClose, onPlayAgain }) => {
         ))}
       </div>
       <div className="flex gap-3">
-        <button onClick={onClose} className="px-6 py-2.5 text-sm font-medium text-slate-400 border border-slate-700 hover:border-slate-500 rounded-xl transition-all">Zatvori</button>
-        <button onClick={onPlayAgain} className="px-6 py-2.5 text-sm font-semibold bg-teal-500 hover:bg-teal-400 text-white rounded-xl transition-colors">Igraj ponovo</button>
+        <button
+          onClick={onClose}
+          className="px-6 py-2.5 text-sm font-medium text-slate-400 border border-slate-700 hover:border-slate-500 rounded-xl transition-all"
+        >
+          Zatvori
+        </button>
+        <button
+          onClick={onPlayAgain}
+          className="px-6 py-2.5 text-sm font-semibold bg-teal-500 hover:bg-teal-400 text-white rounded-xl transition-colors"
+        >
+          Igraj ponovo
+        </button>
       </div>
     </div>
   );
 };
 
-const GeoGame = ({ game, korisnik, chatId, onClose, onPlayAgain, onNextRound }) => (
+const GeoGame = ({
+  game,
+  korisnik,
+  chatId,
+  onClose,
+  onPlayAgain,
+  onNextRound,
+}) => (
   <div className="fixed inset-0 bg-slate-950 z-50 flex flex-col">
     <div className="flex items-center justify-between px-5 py-3 bg-slate-900 border-b border-slate-800/60 shrink-0">
       <div className="flex items-center gap-2">
         <span className="text-base">🌍</span>
         <span className="text-white font-semibold text-sm">Geo Igra</span>
       </div>
-      <button onClick={onClose} className="text-slate-500 hover:text-slate-300 p-1 transition-colors"><XIcon /></button>
+      <button
+        onClick={onClose}
+        className="text-slate-500 hover:text-slate-300 p-1 transition-colors"
+      >
+        <XIcon />
+      </button>
     </div>
     <div className="flex-1 overflow-hidden">
       {game.faza === "lobby" && <GameLobby onCancel={onClose} />}
@@ -1271,7 +1825,8 @@ const GeoGame = ({ game, korisnik, chatId, onClose, onPlayAgain, onNextRound }) 
       )}
       {game.faza === "waiting_round" && (
         <div className="flex items-center justify-center h-full gap-3 text-slate-500">
-          <SpinnerIcon /><span>Čekam sljedeću rundu...</span>
+          <SpinnerIcon />
+          <span>Čekam sljedeću rundu...</span>
         </div>
       )}
       {game.faza === "round_results" && game.rezultati && (
@@ -1283,7 +1838,12 @@ const GeoGame = ({ game, korisnik, chatId, onClose, onPlayAgain, onNextRound }) 
         />
       )}
       {game.faza === "final_results" && game.final && (
-        <FinalResults final={game.final} korisnik={korisnik} onClose={onClose} onPlayAgain={onPlayAgain} />
+        <FinalResults
+          final={game.final}
+          korisnik={korisnik}
+          onClose={onClose}
+          onPlayAgain={onPlayAgain}
+        />
       )}
     </div>
   </div>
@@ -1300,7 +1860,8 @@ const AVATAR_PALETTE = [
 
 const avatarKlasa = (email) => {
   let hash = 0;
-  for (let i = 0; i < email.length; i++) hash = email.charCodeAt(i) + ((hash << 5) - hash);
+  for (let i = 0; i < email.length; i++)
+    hash = email.charCodeAt(i) + ((hash << 5) - hash);
   return AVATAR_PALETTE[Math.abs(hash) % AVATAR_PALETTE.length];
 };
 
@@ -1329,7 +1890,9 @@ const Leaderboard = ({ korisnik, onClose }) => {
     const dohvati = async () => {
       try {
         setUcitavamGrupe(true);
-        const res = await fetch("http://localhost:3001/api/leaderboard/grupe", { headers });
+        const res = await fetch("http://localhost:3001/api/leaderboard/grupe", {
+          headers,
+        });
         if (!res.ok) throw new Error("Greška pri dohvaćanju grupa");
         const data = await res.json();
         setGrupe(data);
@@ -1351,7 +1914,7 @@ const Leaderboard = ({ korisnik, onClose }) => {
         setGreska(null);
         const res = await fetch(
           `http://localhost:3001/api/leaderboard/${encodeURIComponent(odabranaGrupa)}`,
-          { headers }
+          { headers },
         );
         if (!res.ok) throw new Error("Greška pri dohvaćanju rang liste");
         const data = await res.json();
@@ -1366,12 +1929,13 @@ const Leaderboard = ({ korisnik, onClose }) => {
     dohvati();
   }, [odabranaGrupa]);
 
-  const userPozicija = rang.findIndex((r) => r.email_korisnika === korisnik.email_korisnika);
+  const userPozicija = rang.findIndex(
+    (r) => r.email_korisnika === korisnik.email_korisnika,
+  );
   const userEntry = userPozicija !== -1 ? rang[userPozicija] : null;
 
   return (
     <div className="flex flex-col h-full overflow-hidden">
-
       {/* Header */}
       <div className="flex items-center gap-3 px-5 py-4 border-b border-slate-800/60 shrink-0">
         <div className="w-9 h-9 flex items-center justify-center rounded-xl bg-amber-500/10 text-amber-400 text-lg">
@@ -1379,7 +1943,9 @@ const Leaderboard = ({ korisnik, onClose }) => {
         </div>
         <div className="flex-1">
           <h2 className="text-white font-semibold text-sm">Rang lista</h2>
-          <p className="text-xs text-slate-500">Rezultati geo dvoboja po grupama</p>
+          <p className="text-xs text-slate-500">
+            Rezultati geo dvoboja po grupama
+          </p>
         </div>
         <button
           onClick={onClose}
@@ -1391,7 +1957,6 @@ const Leaderboard = ({ korisnik, onClose }) => {
       </div>
 
       <div className="flex-1 overflow-y-auto px-5 py-4 space-y-4">
-
         {/* Tvoj rezultat */}
         {userEntry && (
           <div className="bg-teal-500/10 border border-teal-500/20 rounded-xl px-4 py-3 flex items-center gap-3">
@@ -1399,7 +1964,10 @@ const Leaderboard = ({ korisnik, onClose }) => {
             <div className="flex-1 min-w-0">
               <p className="text-xs text-slate-400">Tvoj rezultat</p>
               <p className="text-sm text-white font-semibold truncate">
-                #{userPozicija + 1} · {Number(userEntry.ukupni_bodovi).toLocaleString()} bodova · {userEntry.broj_pobjeda} {userEntry.broj_pobjeda === 1 ? "pobjeda" : "pobjeda"}
+                #{userPozicija + 1} ·{" "}
+                {Number(userEntry.ukupni_bodovi).toLocaleString()} bodova ·{" "}
+                {userEntry.broj_pobjeda}{" "}
+                {userEntry.broj_pobjeda === 1 ? "pobjeda" : "pobjeda"}
               </p>
             </div>
           </div>
@@ -1414,10 +1982,11 @@ const Leaderboard = ({ korisnik, onClose }) => {
               <button
                 key={g.naziv_grupe}
                 onClick={() => setOdabranaGrupa(g.naziv_grupe)}
-                className={`px-3 py-1.5 rounded-full text-xs font-medium transition-all border ${odabranaGrupa === g.naziv_grupe
-                  ? "bg-teal-500/20 border-teal-500/40 text-teal-400"
-                  : "bg-slate-800/60 border-slate-700/60 text-slate-400 hover:text-slate-200 hover:border-slate-600"
-                  }`}
+                className={`px-3 py-1.5 rounded-full text-xs font-medium transition-all border ${
+                  odabranaGrupa === g.naziv_grupe
+                    ? "bg-teal-500/20 border-teal-500/40 text-teal-400"
+                    : "bg-slate-800/60 border-slate-700/60 text-slate-400 hover:text-slate-200 hover:border-slate-600"
+                }`}
               >
                 {g.naziv_grupe}
               </button>
@@ -1467,26 +2036,39 @@ const Leaderboard = ({ korisnik, onClose }) => {
               return (
                 <div
                   key={entry.email_korisnika}
-                  className={`flex items-center gap-3 px-4 py-3 transition-colors ${i < rang.length - 1 ? "border-b border-slate-700/40" : ""
-                    } ${isUser ? "bg-teal-500/5" : "hover:bg-slate-700/20"}`}
+                  className={`flex items-center gap-3 px-4 py-3 transition-colors ${
+                    i < rang.length - 1 ? "border-b border-slate-700/40" : ""
+                  } ${isUser ? "bg-teal-500/5" : "hover:bg-slate-700/20"}`}
                 >
                   {/* Pozicija */}
                   <div className="w-6 text-center shrink-0">
                     {position <= 3 ? (
-                      <span className="text-base">{RANK_BADGE[position - 1]}</span>
+                      <span className="text-base">
+                        {RANK_BADGE[position - 1]}
+                      </span>
                     ) : (
-                      <span className="text-xs font-medium text-slate-500">#{position}</span>
+                      <span className="text-xs font-medium text-slate-500">
+                        #{position}
+                      </span>
                     )}
                   </div>
 
                   {/* Avatar */}
-                  <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-semibold shrink-0 ${avatarCls}`}>
-                    {inicijali(entry.ime_korisnika, entry.prezime_korisnika, entry.email_korisnika)}
+                  <div
+                    className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-semibold shrink-0 ${avatarCls}`}
+                  >
+                    {inicijali(
+                      entry.ime_korisnika,
+                      entry.prezime_korisnika,
+                      entry.email_korisnika,
+                    )}
                   </div>
 
                   {/* Ime */}
                   <div className="flex-1 min-w-0">
-                    <p className={`text-sm truncate ${isUser ? "text-white font-semibold" : "text-slate-200"}`}>
+                    <p
+                      className={`text-sm truncate ${isUser ? "text-white font-semibold" : "text-slate-200"}`}
+                    >
                       {entry.ime_korisnika
                         ? `${entry.ime_korisnika} ${entry.prezime_korisnika}`
                         : entry.email_korisnika}
@@ -1497,13 +2079,16 @@ const Leaderboard = ({ korisnik, onClose }) => {
                       )}
                     </p>
                     <p className="text-[11px] text-slate-500">
-                      {entry.broj_pobjeda} {entry.broj_pobjeda === 1 ? "pobjeda" : "pobjeda"}
+                      {entry.broj_pobjeda}{" "}
+                      {entry.broj_pobjeda === 1 ? "pobjeda" : "pobjeda"}
                     </p>
                   </div>
 
                   {/* Bodovi */}
                   <div className="text-right shrink-0">
-                    <p className={`text-sm font-semibold ${position === 1 ? "text-amber-400" : "text-slate-200"}`}>
+                    <p
+                      className={`text-sm font-semibold ${position === 1 ? "text-amber-400" : "text-slate-200"}`}
+                    >
                       {Number(entry.ukupni_bodovi).toLocaleString()}
                     </p>
                     <p className="text-[10px] text-slate-600">bodova</p>
@@ -1516,10 +2101,10 @@ const Leaderboard = ({ korisnik, onClose }) => {
 
         {rang.length > 0 && (
           <p className="text-center text-xs text-slate-600">
-            {rang.length} {rang.length === 1 ? "igrač" : "igrača"} u rang listi · {odabranaGrupa}
+            {rang.length} {rang.length === 1 ? "igrač" : "igrača"} u rang listi
+            · {odabranaGrupa}
           </p>
         )}
-
       </div>
     </div>
   );
@@ -1531,7 +2116,15 @@ const formatTime = (ts) => {
   return d.toLocaleTimeString("hr-HR", { hour: "2-digit", minute: "2-digit" });
 };
 
-const ChatView = ({ chat, korisnik, gameInvite, onGameEvent, onStartGame, onShowLeaderboard }) => {
+const ChatView = ({
+  chat,
+  korisnik,
+  gameInvite,
+  onGameEvent,
+  onStartGame,
+  onShowLeaderboard,
+  onPokreniDnevniIzazov,
+}) => {
   const [messages, setMessages] = useState([]);
   const [loadingMsgs, setLoadingMsgs] = useState(true);
   const [inputText, setInputText] = useState("");
@@ -1548,8 +2141,6 @@ const ChatView = ({ chat, korisnik, gameInvite, onGameEvent, onStartGame, onShow
     setImagePreview(URL.createObjectURL(file));
   };
 
-
-
   // Join room, load history, and register all socket listeners
   useEffect(() => {
     if (!chat) return;
@@ -1562,12 +2153,16 @@ const ChatView = ({ chat, korisnik, gameInvite, onGameEvent, onStartGame, onShow
 
     const params =
       chat.type === "individual"
-        ? { type: "individual", e1: chat.email_korisnika_1, e2: chat.email_korisnika_2 }
+        ? {
+            type: "individual",
+            e1: chat.email_korisnika_1,
+            e2: chat.email_korisnika_2,
+          }
         : { type: "group", naziv_grupe: chat.naziv_grupe };
 
     dohvatiPoruke(params)
       .then(setMessages)
-      .catch(() => { })
+      .catch(() => {})
       .finally(() => setLoadingMsgs(false));
 
     const handleNew = (msg) => setMessages((prev) => [...prev, msg]);
@@ -1665,7 +2260,7 @@ const ChatView = ({ chat, korisnik, gameInvite, onGameEvent, onStartGame, onShow
     <>
       {/* Header */}
       <div className="flex items-center gap-3 px-5 py-4 border-b border-slate-800/60 shrink-0">
-        <Avatar name={chat.name} />
+        <Avatar name={chat.name} avatarUrl={chat.slika_profila} />
         <div className="flex-1">
           <h2 className="text-white font-semibold text-sm">{chat.name}</h2>
           <p className="text-xs text-slate-500">
@@ -1682,7 +2277,6 @@ const ChatView = ({ chat, korisnik, gameInvite, onGameEvent, onStartGame, onShow
           >
             🌍
           </button>
-
         )}
         <button
           onClick={onShowLeaderboard}
@@ -1691,27 +2285,42 @@ const ChatView = ({ chat, korisnik, gameInvite, onGameEvent, onStartGame, onShow
         >
           🏆
         </button>
+        {chat.type === "group" && ( // ← DODANO (blok)
+          <button
+            onClick={onPokreniDnevniIzazov}
+            title="Dnevni izazov"
+            className="w-9 h-9 flex items-center justify-center rounded-xl text-slate-400 hover:text-teal-400 hover:bg-slate-800/60 transition-all text-lg"
+          >
+            🌍
+          </button>
+        )}
       </div>
-
       {/* Geo game invite banner */}
       {gameInvite && gameInvite.chatId === chat.id && (
         <div className="mx-4 mt-3 shrink-0 bg-teal-500/10 border border-teal-500/20 rounded-xl p-3 flex items-center justify-between gap-3">
           <span className="text-sm text-slate-300">
-            🌍 <b className="text-teal-400">{gameInvite.inviterEmail.split("@")[0]}</b> te poziva na Geo igru!
+            🌍{" "}
+            <b className="text-teal-400">
+              {gameInvite.inviterEmail.split("@")[0]}
+            </b>{" "}
+            te poziva na Geo igru!
           </span>
           <div className="flex gap-2 shrink-0">
             <button
               onClick={() => onGameEvent("accept", gameInvite)}
               className="px-3 py-1.5 text-xs font-semibold bg-teal-500 hover:bg-teal-400 text-white rounded-lg transition-colors"
-            >Prihvati</button>
+            >
+              Prihvati
+            </button>
             <button
               onClick={() => onGameEvent("decline", {})}
               className="px-3 py-1.5 text-xs text-slate-400 hover:text-slate-200 border border-slate-700 rounded-lg transition-colors"
-            >Odbij</button>
+            >
+              Odbij
+            </button>
           </div>
         </div>
       )}
-
       {/* Message list */}
       <div className="flex-1 overflow-y-auto px-5 py-4 space-y-3">
         {loadingMsgs ? (
@@ -1731,24 +2340,34 @@ const ChatView = ({ chat, korisnik, gameInvite, onGameEvent, onStartGame, onShow
                 key={msg.id_poruke}
                 className={`flex items-end gap-2 ${isMine ? "flex-row-reverse" : ""}`}
               >
-                {!isMine && <Avatar name={msg.posiljatelj_ime} size="sm" />}
-                <div className={`flex flex-col gap-0.5 max-w-xs lg:max-w-md ${isMine ? "items-end" : "items-start"}`}>
+                {!isMine && <Avatar name={msg.posiljatelj_ime} size="sm" avatarUrl={msg.posiljatelj_slika} />}
+                <div
+                  className={`flex flex-col gap-0.5 max-w-xs lg:max-w-md ${isMine ? "items-end" : "items-start"}`}
+                >
                   {chat.type === "group" && !isMine && (
-                    <span className="text-xs text-slate-500 px-1">{msg.posiljatelj_ime}</span>
+                    <span className="text-xs text-slate-500 px-1">
+                      {msg.posiljatelj_ime}
+                    </span>
                   )}
                   {msg.tip_medija === "slika" && msg.poruka_medij_url ? (
                     <img
                       src={`http://localhost:3001${msg.poruka_medij_url}`}
                       alt="slika"
                       className="max-w-xs rounded-2xl overflow-hidden object-cover cursor-pointer"
-                      onClick={() => window.open(`http://localhost:3001${msg.poruka_medij_url}`, "_blank")}
+                      onClick={() =>
+                        window.open(
+                          `http://localhost:3001${msg.poruka_medij_url}`,
+                          "_blank",
+                        )
+                      }
                     />
                   ) : (
                     <div
-                      className={`px-4 py-2.5 rounded-2xl text-sm leading-relaxed ${isMine
-                        ? "bg-teal-600 text-white rounded-br-sm"
-                        : "bg-slate-800 text-slate-200 rounded-bl-sm"
-                        }`}
+                      className={`px-4 py-2.5 rounded-2xl text-sm leading-relaxed ${
+                        isMine
+                          ? "bg-teal-600 text-white rounded-br-sm"
+                          : "bg-slate-800 text-slate-200 rounded-bl-sm"
+                      }`}
                     >
                       {msg.poruka_tekst}
                     </div>
@@ -1763,16 +2382,24 @@ const ChatView = ({ chat, korisnik, gameInvite, onGameEvent, onStartGame, onShow
         )}
         <div ref={bottomRef} />
       </div>
-
       {/* Input bar */}
       <div className="px-4 py-3 border-t border-slate-800/60 shrink-0">
         {imagePreview && (
           <div className="mb-2 relative inline-block">
-            <img src={imagePreview} alt="preview" className="h-20 rounded-xl object-cover" />
+            <img
+              src={imagePreview}
+              alt="preview"
+              className="h-20 rounded-xl object-cover"
+            />
             <button
-              onClick={() => { setImageFile(null); setImagePreview(null); }}
+              onClick={() => {
+                setImageFile(null);
+                setImagePreview(null);
+              }}
               className="absolute -top-1.5 -right-1.5 w-5 h-5 bg-slate-700 hover:bg-rose-500 text-white rounded-full text-xs flex items-center justify-center transition-colors"
-            >✕</button>
+            >
+              ✕
+            </button>
           </div>
         )}
         <div className="flex items-center gap-2 bg-slate-800/60 border border-slate-700/60 rounded-xl px-4 py-2.5 focus-within:border-teal-500/50 transition-all">
@@ -1807,7 +2434,8 @@ const ChatView = ({ chat, korisnik, gameInvite, onGameEvent, onStartGame, onShow
             <SendIcon />
           </button>
         </div>
-      </div>    </>
+      </div>{" "}
+    </>
   );
 };
 
@@ -1822,68 +2450,81 @@ export default function ChatPage({ korisnik, onOdjava }) {
   const [showNewGroup, setShowNewGroup] = useState(false);
   const [showLeaderboard, setShowLeaderboard] = useState(false);
   const [aktivniKorisnik, setAktivniKorisnik] = useState(korisnik); // ← dodaj ovo
-
-
+  const [prikaziDnevniIzazov, setPrikaziDnevniIzazov] = useState(false);
 
   // ── Geo igra ───────────────────────────────────────────────────────────────
   const [activeGame, setActiveGame] = useState(null);
   const [gameInvite, setGameInvite] = useState(null);
 
-  const handleGameEvent = useCallback((event, data) => {
-    switch (event) {
-      case "invite":
-        setGameInvite(data);
-        break;
-      case "accept":
-        setGameInvite(null);
-        setActiveGame({ id_battle: data.idBattle, faza: "lobby" });
-        socket.emit("accept_game", {
-          idBattle: data.idBattle,
-          prihvatioEmail: korisnik.email_korisnika,
-          chatId: data.chatId,
-        });
-        break;
-      case "decline":
-        setGameInvite(null);
-        break;
-      case "started":
-        setGameInvite(null);
-        setActiveGame(g => g
-          ? { ...g, ...data, faza: "playing" }
-          : { ...data, faza: "playing" });
-        break;
-      case "round_start":
-        setActiveGame(g => g ? { ...g, faza: "playing", trenutnaRundaData: data } : g);
-        break;
-      case "round_results":
-        setActiveGame(g => g ? { ...g, faza: "round_results", rezultati: data } : g);
-        break;
-      case "ended":
-        setActiveGame(g => g ? { ...g, faza: "final_results", final: data } : g);
-        break;
-      case "cancelled":
-        setActiveGame(null);
-        setGameInvite(null);
-        break;
-      default:
-        break;
-    }
-  }, [korisnik.email_korisnika]);
+  const handleGameEvent = useCallback(
+    (event, data) => {
+      switch (event) {
+        case "invite":
+          setGameInvite(data);
+          break;
+        case "accept":
+          setGameInvite(null);
+          setActiveGame({ id_battle: data.idBattle, faza: "lobby" });
+          socket.emit("accept_game", {
+            idBattle: data.idBattle,
+            prihvatioEmail: korisnik.email_korisnika,
+            chatId: data.chatId,
+          });
+          break;
+        case "decline":
+          setGameInvite(null);
+          break;
+        case "started":
+          setGameInvite(null);
+          setActiveGame((g) =>
+            g
+              ? { ...g, ...data, faza: "playing" }
+              : { ...data, faza: "playing" },
+          );
+          break;
+        case "round_start":
+          setActiveGame((g) =>
+            g ? { ...g, faza: "playing", trenutnaRundaData: data } : g,
+          );
+          break;
+        case "round_results":
+          setActiveGame((g) =>
+            g ? { ...g, faza: "round_results", rezultati: data } : g,
+          );
+          break;
+        case "ended":
+          setActiveGame((g) =>
+            g ? { ...g, faza: "final_results", final: data } : g,
+          );
+          break;
+        case "cancelled":
+          setActiveGame(null);
+          setGameInvite(null);
+          break;
+        default:
+          break;
+      }
+    },
+    [korisnik.email_korisnika],
+  );
 
-  const handleStartGame = useCallback(async (chatId) => {
-    try {
-      const { id_battle, runde } = await startGeoGame(chatId);
-      setActiveGame({ id_battle, runde, faza: "lobby" });
-      socket.emit("invite_game", {
-        chatId,
-        idBattle: id_battle,
-        runde,
-        inviterEmail: korisnik.email_korisnika,
-      });
-    } catch (err) {
-      alert(err.message);
-    }
-  }, [korisnik.email_korisnika]);
+  const handleStartGame = useCallback(
+    async (chatId) => {
+      try {
+        const { id_battle, runde } = await startGeoGame(chatId);
+        setActiveGame({ id_battle, runde, faza: "lobby" });
+        socket.emit("invite_game", {
+          chatId,
+          idBattle: id_battle,
+          runde,
+          inviterEmail: korisnik.email_korisnika,
+        });
+      } catch (err) {
+        alert(err.message);
+      }
+    },
+    [korisnik.email_korisnika],
+  );
 
   // ── Priče ──────────────────────────────────────────────────────────────────
   const [storyGroups, setStoryGroups] = useState([]);
@@ -1894,10 +2535,14 @@ export default function ChatPage({ korisnik, onOdjava }) {
     try {
       const data = await dohvatiPrice();
       setStoryGroups(data);
-    } catch { /* tiha greška — priče nisu kritične */ }
+    } catch {
+      /* tiha greška — priče nisu kritične */
+    }
   }, []);
 
-  useEffect(() => { ucitajPrice(); }, [ucitajPrice]);
+  useEffect(() => {
+    ucitajPrice();
+  }, [ucitajPrice]);
 
   const handleStoryUploaded = () => {
     setShowStoryUpload(false);
@@ -1906,7 +2551,9 @@ export default function ChatPage({ korisnik, onOdjava }) {
   // ──────────────────────────────────────────────────────────────────────────
 
   useEffect(() => {
-    return () => { socket.disconnect(); };
+    return () => {
+      socket.disconnect();
+    };
   }, []);
 
   const ucitajChatove = useCallback(async () => {
@@ -1922,14 +2569,17 @@ export default function ChatPage({ korisnik, onOdjava }) {
     }
   }, []);
 
-  useEffect(() => { ucitajChatove(); }, [ucitajChatove]);
+  useEffect(() => {
+    ucitajChatove();
+  }, [ucitajChatove]);
 
   const filteredChats = chats.filter((c) => {
     const tabOk =
       activeTab === "Svi" ||
       (activeTab === "Privatni" && c.type === "individual") ||
       (activeTab === "Grupe" && c.type === "group");
-    const searchOk = !searchQuery || c.name.toLowerCase().includes(searchQuery.toLowerCase());
+    const searchOk =
+      !searchQuery || c.name.toLowerCase().includes(searchQuery.toLowerCase());
     return tabOk && searchOk;
   });
 
@@ -1949,51 +2599,72 @@ export default function ChatPage({ korisnik, onOdjava }) {
     setActiveTab("Svi");
   };
 
+  useEffect(() => {
+    setPrikaziDnevniIzazov(false);
+  }, [activeChat?.id]);
+
   return (
     <div className="min-h-screen bg-slate-950 flex relative">
       <MapGridBackground />
 
       <aside className="relative z-10 w-80 shrink-0 flex flex-col bg-slate-900/70 backdrop-blur-sm border-r border-slate-800/60">
-        <SidebarHeader onNewChat={() => setShowNewChat(true)} onNewGroup={() => setShowNewGroup(true)} />
+        <SidebarHeader
+          onNewChat={() => setShowNewChat(true)}
+          onNewGroup={() => setShowNewGroup(true)}
+        />
         <StoriesStrip
-          korisnik={korisnik}
+          korisnik={aktivniKorisnik}
           storyGroups={storyGroups}
-          onOpenStory={(group, idx) => setActiveStoryGroup({ group, startIdx: idx })}
+          onOpenStory={(group, idx) =>
+            setActiveStoryGroup({ group, startIdx: idx })
+          }
           onAddStory={() => setShowStoryUpload(true)}
         />
         <Tabs active={activeTab} onChange={setActiveTab} counts={counts} />
         <ChatSearch value={searchQuery} onChange={setSearchQuery} />
-
         <div className="flex-1 overflow-y-auto px-3 pb-2 space-y-0.5">
           {loading ? (
             <div className="flex items-center justify-center py-12 text-slate-600">
               <SpinnerIcon />
               <span className="ml-2 text-sm">Učitavam razgovore...</span>
             </div>
-
           ) : loadError ? (
             <div className="px-2 py-4 text-center">
               <p className="text-red-400 text-xs mb-2">{loadError}</p>
-              <button onClick={ucitajChatove} className="text-xs text-teal-400 hover:text-teal-300 underline">Pokušaj ponovo</button>
+              <button
+                onClick={ucitajChatove}
+                className="text-xs text-teal-400 hover:text-teal-300 underline"
+              >
+                Pokušaj ponovo
+              </button>
             </div>
           ) : filteredChats.length === 0 ? (
             <div className="text-center py-10">
               <p className="text-slate-600 text-sm">
-                {searchQuery ? `Nema rezultata za "${searchQuery}"` : "Nema razgovora"}
+                {searchQuery
+                  ? `Nema rezultata za "${searchQuery}"`
+                  : "Nema razgovora"}
               </p>
               {!searchQuery && (
-                <button onClick={() => setShowNewChat(true)} className="text-xs text-teal-400 hover:text-teal-300 mt-2 underline">
+                <button
+                  onClick={() => setShowNewChat(true)}
+                  className="text-xs text-teal-400 hover:text-teal-300 mt-2 underline"
+                >
                   Započni prvi razgovor
                 </button>
               )}
             </div>
           ) : (
             filteredChats.map((chat) => (
-              <ChatItem key={chat.id} chat={chat} isActive={activeChat?.id === chat.id} onClick={setActiveChat} />
+              <ChatItem
+                key={chat.id}
+                chat={chat}
+                isActive={activeChat?.id === chat.id}
+                onClick={setActiveChat}
+              />
             ))
           )}
         </div>
-
         <ProfileFooter
           korisnik={aktivniKorisnik}
           onOdjava={onOdjava}
@@ -2001,26 +2672,49 @@ export default function ChatPage({ korisnik, onOdjava }) {
             setAktivniKorisnik(updated);
             sessionStorage.setItem("korisnik", JSON.stringify(updated));
           }}
-        />      </aside>
+        />{" "}
+      </aside>
 
       <main className="relative z-10 flex-1 flex flex-col bg-slate-950/50 backdrop-blur-sm">
         {activeChat ? (
           showLeaderboard ? (
-            <Leaderboard korisnik={korisnik} onClose={() => setShowLeaderboard(false)} />
+            <Leaderboard
+              korisnik={aktivniKorisnik}
+              onClose={() => setShowLeaderboard(false)}
+            />
+          ) : prikaziDnevniIzazov && activeChat.type === "group" ? (
+            <DnevniIzazov
+              chat={activeChat}
+              korisnik={aktivniKorisnik}
+              onZatvori={() => setPrikaziDnevniIzazov(false)}
+            />
           ) : (
             <ChatView
               chat={activeChat}
-              korisnik={korisnik}
+              korisnik={aktivniKorisnik}
               gameInvite={gameInvite}
               onGameEvent={handleGameEvent}
               onStartGame={() => handleStartGame(activeChat.id)}
               onShowLeaderboard={() => setShowLeaderboard(true)}
+              onPokreniDnevniIzazov={() => setPrikaziDnevniIzazov(true)} // ← DODANO
             />
           )
-        ) : <EmptyState />}
+        ) : (
+          <EmptyState />
+        )}
       </main>
-      {showNewChat && <NewChatModal onClose={() => setShowNewChat(false)} onCreate={handleChatCreated} />}
-      {showNewGroup && <NewGroupModal onClose={() => setShowNewGroup(false)} onCreate={handleChatCreated} />}
+      {showNewChat && (
+        <NewChatModal
+          onClose={() => setShowNewChat(false)}
+          onCreate={handleChatCreated}
+        />
+      )}
+      {showNewGroup && (
+        <NewGroupModal
+          onClose={() => setShowNewGroup(false)}
+          onCreate={handleChatCreated}
+        />
+      )}
 
       {showStoryUpload && (
         <StoryUploadModal
@@ -2032,24 +2726,32 @@ export default function ChatPage({ korisnik, onOdjava }) {
         <StoryViewer
           group={activeStoryGroup.group}
           startIndex={activeStoryGroup.startIdx}
-          korisnik={korisnik}
-          onClose={() => { setActiveStoryGroup(null); ucitajPrice(); }}
+          korisnik={aktivniKorisnik}
+          onClose={() => {
+            setActiveStoryGroup(null);
+            ucitajPrice();
+          }}
         />
       )}
 
       {activeGame && (
         <GeoGame
           game={activeGame}
-          korisnik={korisnik}
+          korisnik={aktivniKorisnik}
           chatId={activeChat?.id}
           onClose={() => {
             if (activeGame.id_battle && activeGame.faza !== "final_results") {
-              socket.emit("cancel_game", { idBattle: activeGame.id_battle, chatId: activeChat?.id });
+              socket.emit("cancel_game", {
+                idBattle: activeGame.id_battle,
+                chatId: activeChat?.id,
+              });
             }
             setActiveGame(null);
           }}
           onPlayAgain={() => activeChat && handleStartGame(activeChat.id)}
-          onNextRound={() => setActiveGame(g => g ? { ...g, faza: "waiting_round" } : g)}
+          onNextRound={() =>
+            setActiveGame((g) => (g ? { ...g, faza: "waiting_round" } : g))
+          }
         />
       )}
     </div>
