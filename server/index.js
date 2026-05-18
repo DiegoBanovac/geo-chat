@@ -6,7 +6,7 @@ const path = require('path');
 const express = require('express');
 const cors = require('cors');
 const { Server } = require('socket.io');
-const { Op } = require('sequelize');
+const { Op, QueryTypes } = require('sequelize');
 const sequelize = require('./db');
 const authRoutes     = require('./routes/auth');
 const chatRoutes     = require('./routes/chat');
@@ -15,6 +15,8 @@ const priceRoutes    = require('./routes/price');
 const geoRoutes      = require('./routes/geo');
 const registerChatSocket = require('./sockets/chatSocket');
 const registerGeoSocket  = require('./sockets/geoSocket');
+const korisnikRoutes = require('./routes/korisnici');
+
 
 // Osiguraj da uploads/ postoji
 const uploadsDir = path.join(__dirname, 'uploads');
@@ -25,7 +27,7 @@ const server = http.createServer(app);
 const io     = new Server(server, {
   cors: { origin: 'http://localhost:5173', methods: ['GET', 'POST'] },
 });
-
+app.set("io", io);
 const PORT = process.env.PORT || 3001;
 
 app.use(cors({ origin: 'http://localhost:5173' }));
@@ -39,7 +41,70 @@ app.use('/api', chatRoutes);
 app.use('/api', messagesRoutes);
 app.use('/api', priceRoutes);
 app.use('/api', geoRoutes);
+app.use('/api', korisnikRoutes);
 app.get('/api/health', (_, res) => res.json({ status: 'ok' }));
+
+// ─── Leaderboard routes ───────────────────────────────────────────────────────
+
+// GET /api/leaderboard/grupe
+// Grupe u kojima korisnik ima leaderboard unos
+app.get('/api/leaderboard/grupe', async (req, res) => {
+  const email = req.headers['x-user-email'];
+  if (!email) return res.status(401).json({ poruka: 'Nije autoriziran' });
+  try {
+    const grupe = await sequelize.query(
+      `SELECT DISTINCT l.naziv_grupe
+       FROM geochat.leaderboard l
+       JOIN geochat.clanstvo_u_grupi c
+         ON l.naziv_grupe = c.naziv_grupe
+        AND c.email_korisnika = :email
+       ORDER BY l.naziv_grupe`,
+      { replacements: { email }, type: QueryTypes.SELECT }
+    );
+    res.json(grupe);
+  } catch (err) {
+    console.error('Greška leaderboard/grupe:', err);
+    res.status(500).json({ poruka: 'Interna greška servera' });
+  }
+});
+
+// GET /api/leaderboard/:naziv_grupe
+// Rang lista za grupu (samo ako si član)
+app.get('/api/leaderboard/:naziv_grupe', async (req, res) => {
+  const email = req.headers['x-user-email'];
+  if (!email) return res.status(401).json({ poruka: 'Nije autoriziran' });
+  const { naziv_grupe } = req.params;
+  try {
+    const clanstvo = await sequelize.query(
+      `SELECT 1 FROM geochat.clanstvo_u_grupi
+       WHERE email_korisnika = :email AND naziv_grupe = :naziv`,
+      { replacements: { email, naziv: naziv_grupe }, type: QueryTypes.SELECT }
+    );
+    if (clanstvo.length === 0)
+      return res.status(403).json({ poruka: 'Nemaš pristup ovoj grupi' });
+
+    const rang = await sequelize.query(
+      `SELECT
+         l.email_korisnika,
+         k.ime_korisnika,
+         k.prezime_korisnika,
+         k.slika_profila,
+         l.ukupni_bodovi,
+         l.broj_pobjeda
+       FROM geochat.leaderboard l
+       JOIN geochat.korisnik k ON l.email_korisnika = k.email_korisnika
+       WHERE l.naziv_grupe = :naziv
+       ORDER BY l.ukupni_bodovi DESC, l.broj_pobjeda DESC`,
+      { replacements: { naziv: naziv_grupe }, type: QueryTypes.SELECT }
+    );
+    res.json(rang);
+  } catch (err) {
+    console.error('Greška leaderboard/:naziv_grupe:', err);
+    res.status(500).json({ poruka: 'Interna greška servera' });
+  }
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
 
 registerChatSocket(io);
 registerGeoSocket(io);

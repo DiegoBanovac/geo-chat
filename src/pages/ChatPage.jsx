@@ -102,7 +102,7 @@ const SendIcon = () => (
 );
 const PinIcon = () => (
   <svg width="11" height="11" viewBox="0 0 24 24" fill="currentColor">
-    <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/>
+    <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z" />
   </svg>
 );
 const ImageIcon = () => (
@@ -123,8 +123,8 @@ const ChevronRightIcon = () => (
 );
 
 const AVATAR_COLORS = [
-  "bg-teal-600","bg-cyan-600","bg-blue-600",
-  "bg-violet-600","bg-emerald-600","bg-sky-600",
+  "bg-teal-600", "bg-cyan-600", "bg-blue-600",
+  "bg-violet-600", "bg-emerald-600", "bg-sky-600",
 ];
 const getInitials = (name = "") => {
   const p = name.trim().split(" ");
@@ -370,9 +370,8 @@ const NewGroupModal = ({ onClose, onCreate }) => {
 const ChatItem = ({ chat, isActive, onClick }) => (
   <button
     onClick={() => onClick(chat)}
-    className={`w-full flex items-center gap-3 px-3 py-3 rounded-xl transition-all text-left group ${
-      isActive ? "bg-teal-500/10 border border-teal-500/20" : "hover:bg-slate-800/60 border border-transparent"
-    }`}
+    className={`w-full flex items-center gap-3 px-3 py-3 rounded-xl transition-all text-left group ${isActive ? "bg-teal-500/10 border border-teal-500/20" : "hover:bg-slate-800/60 border border-transparent"
+      }`}
   >
     <Avatar name={chat.name} />
     <div className="flex-1 min-w-0">
@@ -428,9 +427,8 @@ const Tabs = ({ active, onChange, counts }) => (
     {["Svi", "Privatni", "Grupe"].map((tab) => (
       <button
         key={tab} onClick={() => onChange(tab)}
-        className={`flex-1 py-1.5 text-xs font-medium rounded-lg transition-all flex items-center justify-center gap-1.5 ${
-          active === tab ? "bg-teal-500/15 text-teal-400 border border-teal-500/20" : "text-slate-500 hover:text-slate-300"
-        }`}
+        className={`flex-1 py-1.5 text-xs font-medium rounded-lg transition-all flex items-center justify-center gap-1.5 ${active === tab ? "bg-teal-500/15 text-teal-400 border border-teal-500/20" : "text-slate-500 hover:text-slate-300"
+          }`}
       >
         {tab}
         {counts[tab] > 0 && (
@@ -455,25 +453,228 @@ const ChatSearch = ({ value, onChange }) => (
     </div>
   </div>
 );
+const ProfileEditModal = ({ korisnik, onClose, onSave }) => {
+  const [ime, setIme] = useState(korisnik.ime_korisnika);
+  const [prezime, setPrezime] = useState(korisnik.prezime_korisnika);
+  const [datumRodenja, setDatumRodenja] = useState(korisnik.datum_rodenja?.slice(0, 10) || "");
+  const [novaLozinka, setNovaLozinka] = useState("");
+  const [potvrda, setPotvrda] = useState("");
+  const [greska, setGreska] = useState(null);
+  const [saving, setSaving] = useState(false);
+  const [avatarFile, setAvatarFile] = useState(null);
+  const [avatarPreview, setAvatarPreview] = useState(
+    korisnik.slika_profila ? `http://localhost:3001${korisnik.slika_profila}` : null
+  );
+  const avatarInputRef = useRef(null);
 
-const ProfileFooter = ({ korisnik, onOdjava }) => {
+  const handleAvatarSelect = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    setAvatarFile(file);
+    setAvatarPreview(URL.createObjectURL(file));
+  };
+
+  const handleSave = async () => {
+    if (!ime.trim() || !prezime.trim()) {
+      setGreska("Ime i prezime su obavezni."); return;
+    }
+    if (novaLozinka && novaLozinka !== potvrda) {
+      setGreska("Lozinke se ne podudaraju."); return;
+    }
+
+    setSaving(true);
+    setGreska(null);
+
+    try {
+      const body = {
+        ime_korisnika: ime.trim(),
+        prezime_korisnika: prezime.trim(),
+      };
+      if (datumRodenja) body.datum_rodenja = datumRodenja;
+      if (novaLozinka) body.lozinka_korisnika = novaLozinka;
+
+      const res = await fetch(
+        `http://localhost:3001/api/korisnici/${encodeURIComponent(korisnik.email_korisnika)}`,
+        {
+          method: "PUT",
+          headers: {
+            "Content-Type": "application/json",
+            "X-User-Email": korisnik.email_korisnika,
+          },
+          body: JSON.stringify(body),
+        }
+      );
+      if (!res.ok) { const d = await res.json(); throw new Error(d.error || "Greška"); }
+      const updated = await res.json();
+      onSave(updated);
+    } catch (e) {
+      setGreska(e.message);
+    } finally {
+      setSaving(false);
+    }
+  };
   const name = `${korisnik.ime_korisnika} ${korisnik.prezime_korisnika}`;
+
   return (
-    <div className="px-4 py-3 border-t border-slate-800/60 flex items-center gap-3">
-      <div className={`w-8 h-8 rounded-full ${getAvatarColor(name)} flex items-center justify-center text-white text-xs font-bold shrink-0`}>
-        {getInitials(name)}
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm"
+      onClick={(e) => e.target === e.currentTarget && onClose()}
+    >
+      <div className="bg-slate-900 border border-slate-700/60 rounded-2xl w-full max-w-sm mx-4 overflow-hidden">
+
+        {/* Header */}
+        <div className="flex items-center justify-between px-5 py-4 border-b border-slate-800/60">
+          <h2 className="text-white font-semibold text-sm">Uredi profil</h2>
+          <button onClick={onClose} className="text-slate-500 hover:text-slate-200 transition-colors">✕</button>
+        </div>
+
+        <div className="px-5 py-4 space-y-4">
+
+          {/* Avatar */}
+          <div className="flex flex-col items-center gap-2">
+            <button
+              onClick={() => avatarInputRef.current?.click()}
+              className="relative group"
+            >
+              {avatarPreview ? (
+                <img
+                  src={avatarPreview}
+                  alt="avatar"
+                  className="w-16 h-16 rounded-full object-cover ring-2 ring-slate-700 group-hover:ring-teal-500/50 transition-all"
+                />
+              ) : (
+                <div className={`w-16 h-16 rounded-full ${getAvatarColor(name)} flex items-center justify-center text-white text-lg font-bold ring-2 ring-slate-700 group-hover:ring-teal-500/50 transition-all`}>
+                  {getInitials(name)}
+                </div>
+              )}
+              <div className="absolute inset-0 rounded-full bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                <span className="text-white text-xs">Promijeni</span>
+              </div>
+            </button>
+            <input type="file" accept="image/*" ref={avatarInputRef} onChange={handleAvatarSelect} className="hidden" />
+            <p className="text-xs text-slate-500">Klikni za promjenu slike</p>
+          </div>
+
+          {/* Ime */}
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="text-xs text-slate-500 mb-1 block">Ime</label>
+              <input
+                type="text"
+                value={ime}
+                onChange={(e) => setIme(e.target.value)}
+                className="w-full bg-slate-800/60 border border-slate-700/60 rounded-xl px-3 py-2 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-teal-500/50 transition-all"
+              />
+            </div>
+            <div>
+              <label className="text-xs text-slate-500 mb-1 block">Prezime</label>
+              <input
+                type="text"
+                value={prezime}
+                onChange={(e) => setPrezime(e.target.value)}
+                className="w-full bg-slate-800/60 border border-slate-700/60 rounded-xl px-3 py-2 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-teal-500/50 transition-all"
+              />
+            </div>
+          </div>
+
+          {/* Datum rodenja */}
+          <div>
+            <label className="text-xs text-slate-500 mb-1 block">Datum rođenja</label>
+            <input
+              type="date"
+              value={datumRodenja}
+              onChange={(e) => setDatumRodenja(e.target.value)}
+              className="w-full bg-slate-800/60 border border-slate-700/60 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-teal-500/50 transition-all [color-scheme:dark]"
+            />
+          </div>
+
+          {/* Nova lozinka */}
+          <div>
+            <label className="text-xs text-slate-500 mb-1 block">Nova lozinka <span className="text-slate-600">(opcionalno)</span></label>
+            <input
+              type="password"
+              value={novaLozinka}
+              onChange={(e) => setNovaLozinka(e.target.value)}
+              placeholder="Ostavi prazno za zadržavanje"
+              className="w-full bg-slate-800/60 border border-slate-700/60 rounded-xl px-3 py-2 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-teal-500/50 transition-all"
+            />
+          </div>
+
+          {novaLozinka && (
+            <div>
+              <label className="text-xs text-slate-500 mb-1 block">Potvrdi lozinku</label>
+              <input
+                type="password"
+                value={potvrda}
+                onChange={(e) => setPotvrda(e.target.value)}
+                placeholder="Ponovi novu lozinku"
+                className="w-full bg-slate-800/60 border border-slate-700/60 rounded-xl px-3 py-2 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-teal-500/50 transition-all"
+              />
+            </div>
+          )}
+
+          {greska && (
+            <p className="text-xs text-rose-400 bg-rose-500/10 border border-rose-500/20 rounded-xl px-3 py-2">{greska}</p>
+          )}
+        </div>
+
+        {/* Footer */}
+        <div className="flex gap-2 px-5 py-4 border-t border-slate-800/60">
+          <button
+            onClick={onClose}
+            className="flex-1 py-2 rounded-xl text-sm text-slate-400 border border-slate-700/60 hover:border-slate-600 hover:text-slate-200 transition-all"
+          >
+            Odustani
+          </button>
+          <button
+            onClick={handleSave}
+            disabled={saving}
+            className="flex-1 py-2 rounded-xl text-sm font-semibold bg-teal-600 hover:bg-teal-500 disabled:bg-slate-700 disabled:text-slate-500 text-white transition-all"
+          >
+            {saving ? "Spremam..." : "Spremi"}
+          </button>
+        </div>
       </div>
-      <div className="flex-1 min-w-0">
-        <p className="text-sm font-medium text-slate-200 truncate">{name}</p>
-        <p className="text-xs text-slate-600 truncate">{korisnik.email_korisnika}</p>
-      </div>
-      <button onClick={onOdjava} className="text-xs text-slate-500 hover:text-teal-400 transition-colors shrink-0 px-2 py-1 rounded-lg hover:bg-slate-800/60">
-        Odjava
-      </button>
     </div>
   );
 };
+const ProfileFooter = ({ korisnik, onOdjava, onKorisnikUpdate }) => {
+  const [showEdit, setShowEdit] = useState(false);
+  console.log("ProfileFooter korisnik:", korisnik); // ← dodaj ovo
 
+  const name = `${korisnik.ime_korisnika} ${korisnik.prezime_korisnika}`;
+
+  return (
+    <>
+      <div className="px-4 py-3 border-t border-slate-800/60 flex items-center gap-3">
+        <button
+          onClick={() => setShowEdit(true)}
+          className={`w-8 h-8 rounded-full ${getAvatarColor(name)} flex items-center justify-center text-white text-xs font-bold shrink-0 hover:ring-2 hover:ring-teal-500/50 transition-all`}
+        >
+          {getInitials(name)}
+        </button>
+        <div className="flex-1 min-w-0">
+          <p className="text-sm font-medium text-slate-200 truncate">{name}</p>
+          <p className="text-xs text-slate-600 truncate">{korisnik.email_korisnika}</p>
+        </div>
+        <button
+          onClick={onOdjava}
+          className="text-xs text-slate-500 hover:text-teal-400 transition-colors shrink-0 px-2 py-1 rounded-lg hover:bg-slate-800/60"
+        >
+          Odjava
+        </button>
+      </div>
+
+      {showEdit && (
+        <ProfileEditModal
+          korisnik={korisnik}
+          onClose={() => setShowEdit(false)}
+          onSave={(updated) => { onKorisnikUpdate(updated); setShowEdit(false); }}
+        />
+      )}
+    </>
+  );
+};
 const EmptyState = () => (
   <div className="flex-1 flex items-center justify-center">
     <div className="text-center">
@@ -618,7 +819,7 @@ const StoryViewer = ({ group, startIndex, korisnik, onClose }) => {
 
   useEffect(() => {
     if (story && !group.isMine && !story.viewed) {
-      oznaciBrojPriče(story.id_price).catch(() => {});
+      oznaciBrojPriče(story.id_price).catch(() => { });
     }
   }, [story?.id_price]);
 
@@ -626,8 +827,8 @@ const StoryViewer = ({ group, startIndex, korisnik, onClose }) => {
   useEffect(() => {
     const handler = (e) => {
       if (e.key === "ArrowRight") goNext();
-      if (e.key === "ArrowLeft")  goPrev();
-      if (e.key === "Escape")     onClose();
+      if (e.key === "ArrowLeft") goPrev();
+      if (e.key === "Escape") onClose();
     };
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
@@ -725,12 +926,16 @@ const StoryViewer = ({ group, startIndex, korisnik, onClose }) => {
 
 // ─── Stories: StoriesStrip ───────────────────────────────────────────────────
 
-const StoryBubble = ({ label, hasUnviewed, isMine, noStory, onClick }) => (
+const StoryBubble = ({ label, hasUnviewed, isMine, noStory, onClick, avatarUrl }) => (
   <div className="flex flex-col items-center gap-1 shrink-0 cursor-pointer" onClick={onClick}>
     <div className={`p-0.5 rounded-full ${hasUnviewed ? "bg-linear-to-tr from-teal-500 to-cyan-400" : isMine && !noStory ? "bg-linear-to-tr from-teal-500 to-cyan-400" : "bg-slate-700"}`}>
       <div className="p-0.5 bg-slate-900 rounded-full">
-        <div className={`w-10 h-10 rounded-full ${getAvatarColor(label)} flex items-center justify-center text-white text-xs font-bold relative`}>
-          {getInitials(label)}
+        <div className={`w-10 h-10 rounded-full ${getAvatarColor(label)} flex items-center justify-center text-white text-xs font-bold relative overflow-hidden`}>
+          {avatarUrl ? (
+            <img src={avatarUrl} alt={label} className="w-full h-full object-cover rounded-full" />
+          ) : (
+            getInitials(label)
+          )}
           {noStory && (
             <div className="absolute -bottom-0.5 -right-0.5 w-4 h-4 bg-teal-500 rounded-full flex items-center justify-center border-2 border-slate-900">
               <span className="text-white text-[9px] font-bold leading-none">+</span>
@@ -749,6 +954,8 @@ const StoriesStrip = ({ korisnik, storyGroups, onOpenStory, onAddStory }) => {
   const myName = `${korisnik.ime_korisnika} ${korisnik.prezime_korisnika}`;
   const myGroup = storyGroups.find((g) => g.isMine);
   const others = storyGroups.filter((g) => !g.isMine);
+  console.log("korisnik.slika_profila:", korisnik.slika_profila);
+
 
   return (
     <div className="px-3 pt-3 pb-2 border-b border-slate-800/60">
@@ -763,9 +970,10 @@ const StoriesStrip = ({ korisnik, storyGroups, onOpenStory, onAddStory }) => {
           isMine={true}
           noStory={!myGroup}
           onClick={() => (myGroup ? onOpenStory(myGroup, 0) : onAddStory())}
+          avatarUrl={korisnik.slika_profila && korisnik.slika_profila !== ""
+            ? `http://localhost:3001${korisnik.slika_profila}`
+            : null}
         />
-
-        {/* Priče ostalih korisnika */}
         {others.map((group) => (
           <StoryBubble
             key={group.email_korisnika}
@@ -774,9 +982,9 @@ const StoriesStrip = ({ korisnik, storyGroups, onOpenStory, onAddStory }) => {
             isMine={false}
             noStory={false}
             onClick={() => onOpenStory(group, 0)}
+            avatarUrl={group.slika_profila ? `http://localhost:3001${group.slika_profila}` : null}
           />
         ))}
-
         {storyGroups.length === 0 && (
           <p className="text-xs text-slate-600 py-1 px-1">Nema aktivnih priča</p>
         )}
@@ -806,14 +1014,14 @@ const GameLobby = ({ onCancel }) => (
 
 const GameRound = ({ runda, idBattle, chatId, korisnik, ukupnoRundi }) => {
   const [noImagery, setNoImagery] = useState(false);
-  const svRef    = useRef(null);
-  const mapRef   = useRef(null);
+  const svRef = useRef(null);
+  const mapRef = useRef(null);
   const markerRef = useRef(null);
-  const guessRef  = useRef(null);
+  const guessRef = useRef(null);
   const submittedRef = useRef(false);
-  const [guessSet, setGuessSet]   = useState(false);
+  const [guessSet, setGuessSet] = useState(false);
   const [submitted, setSubmitted] = useState(false);
-  const [timeLeft, setTimeLeft]   = useState(60);
+  const [timeLeft, setTimeLeft] = useState(60);
 
   const doSubmit = useCallback(() => {
     if (submittedRef.current) return;
@@ -1006,9 +1214,9 @@ const RoundResults = ({ rezultati, isLast, onNextRound }) => {
 };
 
 const FinalResults = ({ final, korisnik, onClose, onPlayAgain }) => {
-  const myEmail   = korisnik.email_korisnika;
+  const myEmail = korisnik.email_korisnika;
   const iAmWinner = final.pobjednik === myEmail;
-  const igraci    = [final.igrac1, final.igrac2].filter(Boolean);
+  const igraci = [final.igrac1, final.igrac2].filter(Boolean);
 
   return (
     <div className="flex flex-col items-center justify-center h-full p-8 text-center gap-6">
@@ -1080,7 +1288,242 @@ const GeoGame = ({ game, korisnik, chatId, onClose, onPlayAgain, onNextRound }) 
     </div>
   </div>
 );
+// ─── Leaderboard ─────────────────────────────────────────────────────────────
+const AVATAR_PALETTE = [
+  "bg-teal-500/20 text-teal-400",
+  "bg-violet-500/20 text-violet-400",
+  "bg-amber-500/20 text-amber-400",
+  "bg-rose-500/20 text-rose-400",
+  "bg-sky-500/20 text-sky-400",
+  "bg-emerald-500/20 text-emerald-400",
+];
 
+const avatarKlasa = (email) => {
+  let hash = 0;
+  for (let i = 0; i < email.length; i++) hash = email.charCodeAt(i) + ((hash << 5) - hash);
+  return AVATAR_PALETTE[Math.abs(hash) % AVATAR_PALETTE.length];
+};
+
+const inicijali = (ime, prezime, email) => {
+  if (ime && prezime) return (ime[0] + prezime[0]).toUpperCase();
+  if (ime) return ime.slice(0, 2).toUpperCase();
+  const local = email.split("@")[0].split(/[._-]/);
+  return local.length >= 2
+    ? (local[0][0] + local[1][0]).toUpperCase()
+    : email.slice(0, 2).toUpperCase();
+};
+
+const RANK_BADGE = ["👑", "🥈", "🥉"];
+
+const Leaderboard = ({ korisnik, onClose }) => {
+  const [grupe, setGrupe] = useState([]);
+  const [odabranaGrupa, setOdabranaGrupa] = useState(null);
+  const [rang, setRang] = useState([]);
+  const [ucitavamGrupe, setUcitavamGrupe] = useState(true);
+  const [ucitavamRang, setUcitavamRang] = useState(false);
+  const [greska, setGreska] = useState(null);
+
+  const headers = { "X-User-Email": korisnik.email_korisnika };
+
+  useEffect(() => {
+    const dohvati = async () => {
+      try {
+        setUcitavamGrupe(true);
+        const res = await fetch("http://localhost:3001/api/leaderboard/grupe", { headers });
+        if (!res.ok) throw new Error("Greška pri dohvaćanju grupa");
+        const data = await res.json();
+        setGrupe(data);
+        if (data.length > 0) setOdabranaGrupa(data[0].naziv_grupe);
+      } catch (e) {
+        setGreska(e.message);
+      } finally {
+        setUcitavamGrupe(false);
+      }
+    };
+    dohvati();
+  }, [korisnik.email_korisnika]);
+
+  useEffect(() => {
+    if (!odabranaGrupa) return;
+    const dohvati = async () => {
+      try {
+        setUcitavamRang(true);
+        setGreska(null);
+        const res = await fetch(
+          `http://localhost:3001/api/leaderboard/${encodeURIComponent(odabranaGrupa)}`,
+          { headers }
+        );
+        if (!res.ok) throw new Error("Greška pri dohvaćanju rang liste");
+        const data = await res.json();
+        setRang(data);
+      } catch (e) {
+        setGreska(e.message);
+        setRang([]);
+      } finally {
+        setUcitavamRang(false);
+      }
+    };
+    dohvati();
+  }, [odabranaGrupa]);
+
+  const userPozicija = rang.findIndex((r) => r.email_korisnika === korisnik.email_korisnika);
+  const userEntry = userPozicija !== -1 ? rang[userPozicija] : null;
+
+  return (
+    <div className="flex flex-col h-full overflow-hidden">
+
+      {/* Header */}
+      <div className="flex items-center gap-3 px-5 py-4 border-b border-slate-800/60 shrink-0">
+        <div className="w-9 h-9 flex items-center justify-center rounded-xl bg-amber-500/10 text-amber-400 text-lg">
+          🏆
+        </div>
+        <div className="flex-1">
+          <h2 className="text-white font-semibold text-sm">Rang lista</h2>
+          <p className="text-xs text-slate-500">Rezultati geo dvoboja po grupama</p>
+        </div>
+        <button
+          onClick={onClose}
+          title="Zatvori"
+          className="w-9 h-9 flex items-center justify-center rounded-xl text-slate-400 hover:text-slate-200 hover:bg-slate-800/60 transition-all text-lg"
+        >
+          ✕
+        </button>
+      </div>
+
+      <div className="flex-1 overflow-y-auto px-5 py-4 space-y-4">
+
+        {/* Tvoj rezultat */}
+        {userEntry && (
+          <div className="bg-teal-500/10 border border-teal-500/20 rounded-xl px-4 py-3 flex items-center gap-3">
+            <span className="text-base">🎯</span>
+            <div className="flex-1 min-w-0">
+              <p className="text-xs text-slate-400">Tvoj rezultat</p>
+              <p className="text-sm text-white font-semibold truncate">
+                #{userPozicija + 1} · {Number(userEntry.ukupni_bodovi).toLocaleString()} bodova · {userEntry.broj_pobjeda} {userEntry.broj_pobjeda === 1 ? "pobjeda" : "pobjeda"}
+              </p>
+            </div>
+          </div>
+        )}
+
+        {/* Odabir grupe */}
+        {ucitavamGrupe ? (
+          <div className="h-8 bg-slate-800/60 rounded-xl animate-pulse" />
+        ) : grupe.length > 0 ? (
+          <div className="flex gap-2 flex-wrap">
+            {grupe.map((g) => (
+              <button
+                key={g.naziv_grupe}
+                onClick={() => setOdabranaGrupa(g.naziv_grupe)}
+                className={`px-3 py-1.5 rounded-full text-xs font-medium transition-all border ${odabranaGrupa === g.naziv_grupe
+                  ? "bg-teal-500/20 border-teal-500/40 text-teal-400"
+                  : "bg-slate-800/60 border-slate-700/60 text-slate-400 hover:text-slate-200 hover:border-slate-600"
+                  }`}
+              >
+                {g.naziv_grupe}
+              </button>
+            ))}
+          </div>
+        ) : null}
+
+        {/* Greška */}
+        {greska && (
+          <div className="bg-rose-500/10 border border-rose-500/20 rounded-xl px-4 py-3 text-sm text-rose-400">
+            {greska}
+          </div>
+        )}
+
+        {/* Rang lista */}
+        <div className="bg-slate-800/40 border border-slate-700/60 rounded-xl overflow-hidden">
+          {ucitavamRang ? (
+            Array.from({ length: 5 }).map((_, i) => (
+              <div
+                key={i}
+                className={`flex items-center gap-3 px-4 py-3 ${i < 4 ? "border-b border-slate-700/40" : ""}`}
+              >
+                <div className="w-6 h-4 bg-slate-700/60 rounded animate-pulse" />
+                <div className="w-8 h-8 rounded-full bg-slate-700/60 animate-pulse" />
+                <div className="flex-1 space-y-1.5">
+                  <div className="h-3 w-2/5 bg-slate-700/60 rounded animate-pulse" />
+                  <div className="h-2.5 w-1/3 bg-slate-700/60 rounded animate-pulse" />
+                </div>
+                <div className="h-4 w-12 bg-slate-700/60 rounded animate-pulse" />
+              </div>
+            ))
+          ) : rang.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-12 gap-2">
+              <span className="text-3xl">🗺️</span>
+              <p className="text-slate-500 text-sm">
+                {odabranaGrupa
+                  ? "Nema rezultata za ovu grupu još."
+                  : "Odaberi grupu za prikaz rang liste."}
+              </p>
+            </div>
+          ) : (
+            rang.map((entry, i) => {
+              const isUser = entry.email_korisnika === korisnik.email_korisnika;
+              const position = i + 1;
+              const avatarCls = avatarKlasa(entry.email_korisnika);
+
+              return (
+                <div
+                  key={entry.email_korisnika}
+                  className={`flex items-center gap-3 px-4 py-3 transition-colors ${i < rang.length - 1 ? "border-b border-slate-700/40" : ""
+                    } ${isUser ? "bg-teal-500/5" : "hover:bg-slate-700/20"}`}
+                >
+                  {/* Pozicija */}
+                  <div className="w-6 text-center shrink-0">
+                    {position <= 3 ? (
+                      <span className="text-base">{RANK_BADGE[position - 1]}</span>
+                    ) : (
+                      <span className="text-xs font-medium text-slate-500">#{position}</span>
+                    )}
+                  </div>
+
+                  {/* Avatar */}
+                  <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-semibold shrink-0 ${avatarCls}`}>
+                    {inicijali(entry.ime_korisnika, entry.prezime_korisnika, entry.email_korisnika)}
+                  </div>
+
+                  {/* Ime */}
+                  <div className="flex-1 min-w-0">
+                    <p className={`text-sm truncate ${isUser ? "text-white font-semibold" : "text-slate-200"}`}>
+                      {entry.ime_korisnika
+                        ? `${entry.ime_korisnika} ${entry.prezime_korisnika}`
+                        : entry.email_korisnika}
+                      {isUser && (
+                        <span className="ml-2 text-[10px] font-medium text-teal-400 bg-teal-500/10 px-1.5 py-0.5 rounded-full">
+                          ti
+                        </span>
+                      )}
+                    </p>
+                    <p className="text-[11px] text-slate-500">
+                      {entry.broj_pobjeda} {entry.broj_pobjeda === 1 ? "pobjeda" : "pobjeda"}
+                    </p>
+                  </div>
+
+                  {/* Bodovi */}
+                  <div className="text-right shrink-0">
+                    <p className={`text-sm font-semibold ${position === 1 ? "text-amber-400" : "text-slate-200"}`}>
+                      {Number(entry.ukupni_bodovi).toLocaleString()}
+                    </p>
+                    <p className="text-[10px] text-slate-600">bodova</p>
+                  </div>
+                </div>
+              );
+            })
+          )}
+        </div>
+
+        {rang.length > 0 && (
+          <p className="text-center text-xs text-slate-600">
+            {rang.length} {rang.length === 1 ? "igrač" : "igrača"} u rang listi · {odabranaGrupa}
+          </p>
+        )}
+
+      </div>
+    </div>
+  );
+};
 // ─── Chat formatters ─────────────────────────────────────────────────────────
 
 const formatTime = (ts) => {
@@ -1088,12 +1531,24 @@ const formatTime = (ts) => {
   return d.toLocaleTimeString("hr-HR", { hour: "2-digit", minute: "2-digit" });
 };
 
-const ChatView = ({ chat, korisnik, gameInvite, onGameEvent, onStartGame }) => {
+const ChatView = ({ chat, korisnik, gameInvite, onGameEvent, onStartGame, onShowLeaderboard }) => {
   const [messages, setMessages] = useState([]);
   const [loadingMsgs, setLoadingMsgs] = useState(true);
   const [inputText, setInputText] = useState("");
   const bottomRef = useRef(null);
   const inputRef = useRef(null);
+  const [imageFile, setImageFile] = useState(null);
+  const [imagePreview, setImagePreview] = useState(null);
+  const fileInputRef = useRef(null);
+
+  const handleImageSelect = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    setImageFile(file);
+    setImagePreview(URL.createObjectURL(file));
+  };
+
+
 
   // Join room, load history, and register all socket listeners
   useEffect(() => {
@@ -1112,35 +1567,35 @@ const ChatView = ({ chat, korisnik, gameInvite, onGameEvent, onStartGame }) => {
 
     dohvatiPoruke(params)
       .then(setMessages)
-      .catch(() => {})
+      .catch(() => { })
       .finally(() => setLoadingMsgs(false));
 
     const handleNew = (msg) => setMessages((prev) => [...prev, msg]);
     socket.on("new_message", handleNew);
 
     // Geo game socket events
-    const onGameInvite    = (d) => onGameEvent("invite",        d);
-    const onGameStarted   = (d) => onGameEvent("started",       d);
-    const onRoundStart    = (d) => onGameEvent("round_start",   d);
-    const onRoundResults  = (d) => onGameEvent("round_results", d);
-    const onGameEnded     = (d) => onGameEvent("ended",         d);
-    const onGameCancelled = (d) => onGameEvent("cancelled",     d);
+    const onGameInvite = (d) => onGameEvent("invite", d);
+    const onGameStarted = (d) => onGameEvent("started", d);
+    const onRoundStart = (d) => onGameEvent("round_start", d);
+    const onRoundResults = (d) => onGameEvent("round_results", d);
+    const onGameEnded = (d) => onGameEvent("ended", d);
+    const onGameCancelled = (d) => onGameEvent("cancelled", d);
 
-    socket.on("game_invite",    onGameInvite);
-    socket.on("game_started",   onGameStarted);
-    socket.on("round_start",    onRoundStart);
-    socket.on("round_results",  onRoundResults);
-    socket.on("game_ended",     onGameEnded);
+    socket.on("game_invite", onGameInvite);
+    socket.on("game_started", onGameStarted);
+    socket.on("round_start", onRoundStart);
+    socket.on("round_results", onRoundResults);
+    socket.on("game_ended", onGameEnded);
     socket.on("game_cancelled", onGameCancelled);
 
     return () => {
       socket.emit("leave_chat", { chatId: chat.id });
       socket.off("new_message", handleNew);
-      socket.off("game_invite",    onGameInvite);
-      socket.off("game_started",   onGameStarted);
-      socket.off("round_start",    onRoundStart);
-      socket.off("round_results",  onRoundResults);
-      socket.off("game_ended",     onGameEnded);
+      socket.off("game_invite", onGameInvite);
+      socket.off("game_started", onGameStarted);
+      socket.off("round_start", onRoundStart);
+      socket.off("round_results", onRoundResults);
+      socket.off("game_ended", onGameEnded);
       socket.off("game_cancelled", onGameCancelled);
     };
   }, [chat.id]);
@@ -1150,9 +1605,36 @@ const ChatView = ({ chat, korisnik, gameInvite, onGameEvent, onStartGame }) => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
-  const sendMessage = () => {
+  const sendMessage = async () => {
     const text = inputText.trim();
-    if (!text) return;
+    if (!text && !imageFile) return;
+    if (imageFile) {
+      const formData = new FormData();
+      formData.append("slika", imageFile);
+      formData.append("chatId", chat.id);
+      formData.append("senderEmail", korisnik.email_korisnika);
+      if (chat.type === "individual") {
+        formData.append("e1", chat.email_korisnika_1);
+        formData.append("e2", chat.email_korisnika_2);
+      } else {
+        formData.append("naziv_grupe", chat.naziv_grupe);
+      }
+
+      try {
+        await fetch("http://localhost:3001/api/messages/upload", {
+          method: "POST",
+          headers: { "X-User-Email": korisnik.email_korisnika },
+          body: formData,
+        });
+      } catch (err) {
+        console.error("Upload greška:", err);
+      }
+
+      setImageFile(null);
+      setImagePreview(null);
+      if (fileInputRef.current) fileInputRef.current.value = "";
+      return;
+    }
 
     const payload = {
       chatId: chat.id,
@@ -1200,7 +1682,15 @@ const ChatView = ({ chat, korisnik, gameInvite, onGameEvent, onStartGame }) => {
           >
             🌍
           </button>
+
         )}
+        <button
+          onClick={onShowLeaderboard}
+          title="Rang lista"
+          className="w-9 h-9 flex items-center justify-center rounded-xl text-slate-400 hover:text-amber-400 hover:bg-slate-800/60 transition-all text-lg"
+        >
+          🏆
+        </button>
       </div>
 
       {/* Geo game invite banner */}
@@ -1246,15 +1736,23 @@ const ChatView = ({ chat, korisnik, gameInvite, onGameEvent, onStartGame }) => {
                   {chat.type === "group" && !isMine && (
                     <span className="text-xs text-slate-500 px-1">{msg.posiljatelj_ime}</span>
                   )}
-                  <div
-                    className={`px-4 py-2.5 rounded-2xl text-sm leading-relaxed ${
-                      isMine
+                  {msg.tip_medija === "slika" && msg.poruka_medij_url ? (
+                    <img
+                      src={`http://localhost:3001${msg.poruka_medij_url}`}
+                      alt="slika"
+                      className="max-w-xs rounded-2xl overflow-hidden object-cover cursor-pointer"
+                      onClick={() => window.open(`http://localhost:3001${msg.poruka_medij_url}`, "_blank")}
+                    />
+                  ) : (
+                    <div
+                      className={`px-4 py-2.5 rounded-2xl text-sm leading-relaxed ${isMine
                         ? "bg-teal-600 text-white rounded-br-sm"
                         : "bg-slate-800 text-slate-200 rounded-bl-sm"
-                    }`}
-                  >
-                    {msg.poruka_tekst}
-                  </div>
+                        }`}
+                    >
+                      {msg.poruka_tekst}
+                    </div>
+                  )}
                   <span className="text-[10px] text-slate-600 px-1">
                     {formatTime(msg.vrijeme_slanja)}
                   </span>
@@ -1268,7 +1766,30 @@ const ChatView = ({ chat, korisnik, gameInvite, onGameEvent, onStartGame }) => {
 
       {/* Input bar */}
       <div className="px-4 py-3 border-t border-slate-800/60 shrink-0">
+        {imagePreview && (
+          <div className="mb-2 relative inline-block">
+            <img src={imagePreview} alt="preview" className="h-20 rounded-xl object-cover" />
+            <button
+              onClick={() => { setImageFile(null); setImagePreview(null); }}
+              className="absolute -top-1.5 -right-1.5 w-5 h-5 bg-slate-700 hover:bg-rose-500 text-white rounded-full text-xs flex items-center justify-center transition-colors"
+            >✕</button>
+          </div>
+        )}
         <div className="flex items-center gap-2 bg-slate-800/60 border border-slate-700/60 rounded-xl px-4 py-2.5 focus-within:border-teal-500/50 transition-all">
+          <input
+            type="file"
+            accept="image/*"
+            ref={fileInputRef}
+            onChange={handleImageSelect}
+            className="hidden"
+          />
+          <button
+            onClick={() => fileInputRef.current?.click()}
+            className="text-slate-500 hover:text-slate-300 transition-colors shrink-0"
+            title="Pošalji sliku"
+          >
+            <ImageIcon />
+          </button>
           <input
             ref={inputRef}
             type="text"
@@ -1280,14 +1801,13 @@ const ChatView = ({ chat, korisnik, gameInvite, onGameEvent, onStartGame }) => {
           />
           <button
             onClick={sendMessage}
-            disabled={!inputText.trim()}
+            disabled={!inputText.trim() && !imageFile}
             className="text-teal-500 hover:text-teal-400 disabled:text-slate-700 transition-colors shrink-0"
           >
             <SendIcon />
           </button>
         </div>
-      </div>
-    </>
+      </div>    </>
   );
 };
 
@@ -1300,6 +1820,10 @@ export default function ChatPage({ korisnik, onOdjava }) {
   const [searchQuery, setSearchQuery] = useState("");
   const [showNewChat, setShowNewChat] = useState(false);
   const [showNewGroup, setShowNewGroup] = useState(false);
+  const [showLeaderboard, setShowLeaderboard] = useState(false);
+  const [aktivniKorisnik, setAktivniKorisnik] = useState(korisnik); // ← dodaj ovo
+
+
 
   // ── Geo igra ───────────────────────────────────────────────────────────────
   const [activeGame, setActiveGame] = useState(null);
@@ -1446,6 +1970,7 @@ export default function ChatPage({ korisnik, onOdjava }) {
               <SpinnerIcon />
               <span className="ml-2 text-sm">Učitavam razgovore...</span>
             </div>
+
           ) : loadError ? (
             <div className="px-2 py-4 text-center">
               <p className="text-red-400 text-xs mb-2">{loadError}</p>
@@ -1469,21 +1994,31 @@ export default function ChatPage({ korisnik, onOdjava }) {
           )}
         </div>
 
-        <ProfileFooter korisnik={korisnik} onOdjava={onOdjava} />
-      </aside>
+        <ProfileFooter
+          korisnik={aktivniKorisnik}
+          onOdjava={onOdjava}
+          onKorisnikUpdate={(updated) => {
+            setAktivniKorisnik(updated);
+            sessionStorage.setItem("korisnik", JSON.stringify(updated));
+          }}
+        />      </aside>
 
       <main className="relative z-10 flex-1 flex flex-col bg-slate-950/50 backdrop-blur-sm">
         {activeChat ? (
-          <ChatView
-            chat={activeChat}
-            korisnik={korisnik}
-            gameInvite={gameInvite}
-            onGameEvent={handleGameEvent}
-            onStartGame={() => handleStartGame(activeChat.id)}
-          />
+          showLeaderboard ? (
+            <Leaderboard korisnik={korisnik} onClose={() => setShowLeaderboard(false)} />
+          ) : (
+            <ChatView
+              chat={activeChat}
+              korisnik={korisnik}
+              gameInvite={gameInvite}
+              onGameEvent={handleGameEvent}
+              onStartGame={() => handleStartGame(activeChat.id)}
+              onShowLeaderboard={() => setShowLeaderboard(true)}
+            />
+          )
         ) : <EmptyState />}
       </main>
-
       {showNewChat && <NewChatModal onClose={() => setShowNewChat(false)} onCreate={handleChatCreated} />}
       {showNewGroup && <NewGroupModal onClose={() => setShowNewGroup(false)} onCreate={handleChatCreated} />}
 

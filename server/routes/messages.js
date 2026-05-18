@@ -2,6 +2,8 @@
 const express = require('express');
 const router = express.Router();
 const { Op } = require('sequelize');
+const path = require('path');
+const multer = require('multer');
 const Poruka = require('../models/Poruka');
 const Korisnik = require('../models/Korisnik');
 
@@ -53,20 +55,74 @@ router.get('/messages', requireAuth, async (req, res) => {
     );
 
     const result = poruke.map((p) => ({
-      id_poruke:        p.id_poruke,
+      id_poruke:         p.id_poruke,
       posiljatelj_email: p.posiljatelj_email,
-      posiljatelj_ime:  korisnikMap[p.posiljatelj_email] || p.posiljatelj_email,
-      naziv_grupe:      p.naziv_grupe,
-      primatelj_email:  p.primatelj_email,
-      vrijeme_slanja:   p.vrijeme_slanja,
-      poruka_tekst:     p.poruka_tekst,
-      tip_medija:       p.tip_medija,
+      posiljatelj_ime:   korisnikMap[p.posiljatelj_email] || p.posiljatelj_email,
+      naziv_grupe:       p.naziv_grupe,
+      primatelj_email:   p.primatelj_email,
+      vrijeme_slanja:    p.vrijeme_slanja,
+      poruka_tekst:      p.poruka_tekst,
+      tip_medija:        p.tip_medija,
+      poruka_medij_url:  p.poruka_medij_url,
     }));
 
     res.json(result);
   } catch (err) {
     console.error('Dohvat poruka greška:', err);
     res.status(500).json({ error: 'Greška pri dohvatu poruka' });
+  }
+});
+
+// ─── Upload slike u poruci ────────────────────────────────────────────────────
+
+const storage = multer.diskStorage({
+  destination: (req, file, cb) => cb(null, path.join(__dirname, '../uploads')),
+  filename:    (req, file, cb) => cb(null, `msg_${Date.now()}${path.extname(file.originalname)}`),
+});
+const upload = multer({ storage, limits: { fileSize: 10 * 1024 * 1024 } });
+
+// POST /api/messages/upload
+router.post('/messages/upload', requireAuth, upload.single('slika'), async (req, res) => {
+  if (!req.file) return res.status(400).json({ error: 'Nema slike' });
+
+  const { chatId, e1, e2, naziv_grupe } = req.body;
+  const medijaUrl = `/uploads/${req.file.filename}`;
+
+  try {
+    const poruka = await Poruka.create({
+      posiljatelj_email: req.userEmail,
+      primatelj_email:   e2     || null,
+      naziv_grupe:       naziv_grupe || null,
+      poruka_medij_url:  medijaUrl,
+      tip_medija:        'slika',
+    });
+
+    const korisnik = await Korisnik.findOne({
+      where: { email_korisnika: req.userEmail },
+      attributes: ['ime_korisnika', 'prezime_korisnika'],
+    });
+
+    const result = {
+      id_poruke:         poruka.id_poruke,
+      posiljatelj_email: poruka.posiljatelj_email,
+      posiljatelj_ime:   korisnik
+        ? `${korisnik.ime_korisnika} ${korisnik.prezime_korisnika}`
+        : req.userEmail,
+      naziv_grupe:       poruka.naziv_grupe,
+      primatelj_email:   poruka.primatelj_email,
+      vrijeme_slanja:    poruka.vrijeme_slanja,
+      poruka_tekst:      null,
+      tip_medija:        'slika',
+      poruka_medij_url:  medijaUrl,
+    };
+
+    const io = req.app.get('io');
+    if (io) io.to(chatId).emit('new_message', result);
+
+    res.json(result);
+  } catch (err) {
+    console.error('Upload poruke greška:', err);
+    res.status(500).json({ error: 'Greška pri uploadu slike' });
   }
 });
 

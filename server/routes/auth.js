@@ -41,4 +41,31 @@ router.post('/register', async (req, res) => {
   }
 });
 
+// PUT /api/korisnici/:email
+router.put('/korisnici/:email', async (req, res) => {
+  const emailIzHeadera = req.headers['x-user-email'];
+  if (!emailIzHeadera || emailIzHeadera !== req.params.email)
+    return res.status(403).json({ error: 'Zabranjen pristup' });
+
+  const { ime_korisnika, prezime_korisnika, datum_rodenja, lozinka_korisnika } = req.body;
+  if (!ime_korisnika || !prezime_korisnika)
+    return res.status(400).json({ error: 'Ime i prezime su obavezni' });
+
+  try {
+    const korisnik = await Korisnik.findOne({ where: { email_korisnika: req.params.email } });
+    if (!korisnik) return res.status(404).json({ error: 'Korisnik nije pronađen' });
+
+    korisnik.ime_korisnika     = ime_korisnika;
+    korisnik.prezime_korisnika = prezime_korisnika;
+    if (datum_rodenja)     korisnik.datum_rodenja     = datum_rodenja;
+    if (lozinka_korisnika) korisnik.lozinka_korisnika = lozinka_korisnika;
+
+    await korisnik.save();
+    return res.json(korisnik.toJSON());
+  } catch (err) {
+    console.error('Update korisnika greška:', err);
+    return res.status(500).json({ error: 'Greška pri ažuriranju profila' });
+  }
+});
+
 module.exports = router;
