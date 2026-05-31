@@ -38,6 +38,7 @@ export async function registerKorisnik({ ime, prezime, email, lozinka, datum_rod
 
 export function odjavaKorisnik() {
   sessionStorage.removeItem('userEmail');
+  localStorage.removeItem('korisnik');
 }
 
 // ─── Korisnici ───────────────────────────────────────────────────────────────

@@ -273,4 +273,223 @@ router.post('/chats/group', requireAuth, async (req, res) => {
   }
 });
 
+// ════════════════════════════════════════════════════════════════════════════
+//  Upravljanje grupom (dodavanje/uklanjanje članova, preimenovanje, brisanje)
+//  Socket.io notifikacije: svaka promjena odmah stiže svim pogođenim korisnicima
+// ════════════════════════════════════════════════════════════════════════════
+
+// Helper: dohvati sve email-ove članova grupe
+async function emailoviClanova(nazivGrupe) {
+  const clanstva = await ClanstvoUGrupi.findAll({ where: { naziv_grupe: nazivGrupe } });
+  return clanstva.map((c) => c.email_korisnika);
+}
+
+// Helper: emitira event svim članima grupe (svaki ima osobni user_{email} room)
+function notificirajClanove(io, emailovi, event, payload) {
+  emailovi.forEach((email) => io.to(`user_${email}`).emit(event, payload));
+}
+
+// ─── GET /api/chats/group/:naziv/members ─────────────────────────────────────
+router.get('/chats/group/:naziv/members', requireAuth, async (req, res) => {
+  const nazivGrupe = decodeURIComponent(req.params.naziv);
+  const email = req.userEmail;
+  try {
+    const clanstvo = await ClanstvoUGrupi.findOne({ where: { email_korisnika: email, naziv_grupe: nazivGrupe } });
+    if (!clanstvo) return res.status(403).json({ error: 'Nisi član ove grupe' });
+
+    const clanovi = await ClanstvoUGrupi.findAll({ where: { naziv_grupe: nazivGrupe } });
+    const rezultat = await Promise.all(clanovi.map(async (c) => {
+      const k = await Korisnik.findOne({
+        where: { email_korisnika: c.email_korisnika },
+        attributes: ['email_korisnika', 'ime_korisnika', 'prezime_korisnika', 'slika_profila'],
+      });
+      return { email_korisnika: c.email_korisnika, ime_korisnika: k?.ime_korisnika ?? '', prezime_korisnika: k?.prezime_korisnika ?? '', slika_profila: k?.slika_profila ?? null, is_admin: c.is_admin };
+    }));
+    res.json(rezultat);
+  } catch (err) {
+    console.error('Dohvat članova greška:', err);
+    res.status(500).json({ error: 'Greška pri dohvatu članova' });
+  }
+});
+
+// ─── POST /api/chats/group/:naziv/members ────────────────────────────────────
+// Dodaj člana — dostupno svim članovima grupe
+router.post('/chats/group/:naziv/members', requireAuth, async (req, res) => {
+  const nazivGrupe = decodeURIComponent(req.params.naziv);
+  const zahtjevatelj = req.userEmail;
+  const { email_korisnika } = req.body;
+  const io = req.app.get('io');
+
+  if (!email_korisnika) return res.status(400).json({ error: 'Email novog člana je obavezan' });
+
+  try {
+    const mojeclanstvo = await ClanstvoUGrupi.findOne({ where: { email_korisnika: zahtjevatelj, naziv_grupe: nazivGrupe } });
+    if (!mojeclanstvo) return res.status(403).json({ error: 'Nisi član ove grupe' });
+
+    const noviKorisnik = await Korisnik.findOne({
+      where: { email_korisnika },
+      attributes: ['email_korisnika', 'ime_korisnika', 'prezime_korisnika', 'slika_profila'],
+    });
+    if (!noviKorisnik) return res.status(404).json({ error: 'Korisnik ne postoji' });
+
+    const vecClan = await ClanstvoUGrupi.findOne({ where: { email_korisnika, naziv_grupe: nazivGrupe } });
+    if (vecClan) return res.status(409).json({ error: 'Korisnik je već član grupe' });
+
+    await ClanstvoUGrupi.create({ email_korisnika, naziv_grupe: nazivGrupe, is_admin: false });
+
+    const brojClanova = await ClanstvoUGrupi.count({ where: { naziv_grupe: nazivGrupe } });
+
+    const noviClanData = {
+      email_korisnika,
+      ime_korisnika: noviKorisnik.ime_korisnika,
+      prezime_korisnika: noviKorisnik.prezime_korisnika,
+      slika_profila: noviKorisnik.slika_profila ?? null,
+      is_admin: false,
+    };
+
+    // Notificiraj sve postojeće članove da se broj promijenio
+    const postojeciEmailovi = (await emailoviClanova(nazivGrupe)).filter(e => e !== email_korisnika);
+    notificirajClanove(io, postojeciEmailovi, 'group_member_count_changed', {
+      naziv_grupe: nazivGrupe,
+      memberCount: brojClanova,
+    });
+
+    // Novom članu pošalji cijeli grupni chat objekt da ga doda u svoju listu
+    const grupa = await GrupniRazgovor.findOne({ where: { naziv_grupe: nazivGrupe } });
+    const mojeClanstvoAdmin = await ClanstvoUGrupi.findOne({ where: { email_korisnika, naziv_grupe: nazivGrupe } });
+    io.to(`user_${email_korisnika}`).emit('group_added', {
+      type: 'group',
+      id: `gr_${nazivGrupe}`,
+      naziv_grupe: nazivGrupe,
+      name: nazivGrupe,
+      is_admin: false,
+      memberCount: brojClanova,
+      datum_kreiranja: grupa?.datum_kreiranja ?? new Date(),
+    });
+
+    res.status(201).json(noviClanData);
+  } catch (err) {
+    console.error('Dodavanje člana greška:', err);
+    res.status(500).json({ error: 'Greška pri dodavanju člana' });
+  }
+});
+
+// ─── DELETE /api/chats/group/:naziv/members/:memberEmail ─────────────────────
+// Ukloni člana — samo admin
+router.delete('/chats/group/:naziv/members/:memberEmail', requireAuth, async (req, res) => {
+  const nazivGrupe = decodeURIComponent(req.params.naziv);
+  const adminEmail = req.userEmail;
+  const memberEmail = decodeURIComponent(req.params.memberEmail);
+  const io = req.app.get('io');
+
+  try {
+    const adminClanstvo = await ClanstvoUGrupi.findOne({ where: { email_korisnika: adminEmail, naziv_grupe: nazivGrupe, is_admin: true } });
+    if (!adminClanstvo) return res.status(403).json({ error: 'Samo admin može uklanjati članove' });
+
+    if (memberEmail === adminEmail) return res.status(400).json({ error: 'Admin ne može ukloniti samog sebe.' });
+
+    const deleted = await ClanstvoUGrupi.destroy({ where: { email_korisnika: memberEmail, naziv_grupe: nazivGrupe } });
+    if (!deleted) return res.status(404).json({ error: 'Član nije pronađen' });
+
+    const brojClanova = await ClanstvoUGrupi.count({ where: { naziv_grupe: nazivGrupe } });
+
+    // Preostalim članovima pošalji novi broj
+    const preostaliEmailovi = await emailoviClanova(nazivGrupe);
+    notificirajClanove(io, preostaliEmailovi, 'group_member_count_changed', {
+      naziv_grupe: nazivGrupe,
+      memberCount: brojClanova,
+    });
+
+    // Uklonjenom članu pošalji signal da mu se makne chat
+    io.to(`user_${memberEmail}`).emit('group_removed', { naziv_grupe: nazivGrupe });
+
+    res.json({ success: true });
+  } catch (err) {
+    console.error('Uklanjanje člana greška:', err);
+    res.status(500).json({ error: 'Greška pri uklanjanju člana' });
+  }
+});
+
+// ─── PATCH /api/chats/group/:naziv ───────────────────────────────────────────
+// Preimenuj grupu — samo admin
+router.patch('/chats/group/:naziv', requireAuth, async (req, res) => {
+  const stariNaziv = decodeURIComponent(req.params.naziv);
+  const adminEmail = req.userEmail;
+  const { novi_naziv } = req.body;
+  const io = req.app.get('io');
+
+  if (!novi_naziv || novi_naziv.trim().length < 2) return res.status(400).json({ error: 'Naziv mora imati najmanje 2 znaka' });
+  const noviNazivTrim = novi_naziv.trim();
+
+  try {
+    const adminClanstvo = await ClanstvoUGrupi.findOne({ where: { email_korisnika: adminEmail, naziv_grupe: stariNaziv, is_admin: true } });
+    if (!adminClanstvo) return res.status(403).json({ error: 'Samo admin može preimenovati grupu' });
+
+    const postojeci = await GrupniRazgovor.findOne({ where: { naziv_grupe: noviNazivTrim } });
+    if (postojeci && noviNazivTrim !== stariNaziv) return res.status(409).json({ error: 'Naziv grupe je već zauzet' });
+
+    // Dohvati sve emailove PRIJE rename-a
+    const sviEmailovi = await emailoviClanova(stariNaziv);
+
+    const t = await sequelize.transaction();
+    try {
+      await GrupniRazgovor.create({ naziv_grupe: noviNazivTrim, datum_kreiranja: new Date() }, { transaction: t });
+      await ClanstvoUGrupi.update({ naziv_grupe: noviNazivTrim }, { where: { naziv_grupe: stariNaziv }, transaction: t });
+      await GrupniRazgovor.destroy({ where: { naziv_grupe: stariNaziv }, transaction: t });
+      await t.commit();
+    } catch (e) {
+      await t.rollback();
+      throw e;
+    }
+
+    const brojClanova = await ClanstvoUGrupi.count({ where: { naziv_grupe: noviNazivTrim } });
+
+    // Svim članovima pošalji novi naziv
+    notificirajClanove(io, sviEmailovi, 'group_renamed', {
+      stari_naziv: stariNaziv,
+      novi_naziv: noviNazivTrim,
+      memberCount: brojClanova,
+    });
+
+    res.json({ naziv_grupe: noviNazivTrim });
+  } catch (err) {
+    console.error('Preimenovanje grupe greška:', err);
+    res.status(500).json({ error: 'Greška pri preimenovanju grupe' });
+  }
+});
+
+// ─── DELETE /api/chats/group/:naziv ──────────────────────────────────────────
+// Obriši grupu — samo admin
+router.delete('/chats/group/:naziv', requireAuth, async (req, res) => {
+  const nazivGrupe = decodeURIComponent(req.params.naziv);
+  const adminEmail = req.userEmail;
+  const io = req.app.get('io');
+
+  try {
+    const adminClanstvo = await ClanstvoUGrupi.findOne({ where: { email_korisnika: adminEmail, naziv_grupe: nazivGrupe, is_admin: true } });
+    if (!adminClanstvo) return res.status(403).json({ error: 'Samo admin može obrisati grupu' });
+
+    // Dohvati sve emailove PRIJE brisanja
+    const sviEmailovi = await emailoviClanova(nazivGrupe);
+
+    const t = await sequelize.transaction();
+    try {
+      await ClanstvoUGrupi.destroy({ where: { naziv_grupe: nazivGrupe }, transaction: t });
+      await GrupniRazgovor.destroy({ where: { naziv_grupe: nazivGrupe }, transaction: t });
+      await t.commit();
+    } catch (e) {
+      await t.rollback();
+      throw e;
+    }
+
+    // Svim (bivšim) članovima pošalji signal da maknu grupu
+    notificirajClanove(io, sviEmailovi, 'group_removed', { naziv_grupe: nazivGrupe });
+
+    res.json({ success: true });
+  } catch (err) {
+    console.error('Brisanje grupe greška:', err);
+    res.status(500).json({ error: 'Greška pri brisanju grupe' });
+  }
+});
+
 module.exports = router;

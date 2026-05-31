@@ -177,6 +177,31 @@ const ChatBubbleIcon = () => (
     <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
   </svg>
 );
+
+const SettingsIcon = () => (
+  <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+    <circle cx="12" cy="12" r="3"/>
+    <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+  </svg>
+);
+const TrashIcon = () => (
+  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/>
+    <path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4h6v2"/>
+  </svg>
+);
+const EditIcon = () => (
+  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
+    <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+  </svg>
+);
+const CrownIcon = () => (
+  <svg width="11" height="11" viewBox="0 0 24 24" fill="currentColor">
+    <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>
+  </svg>
+);
+
 const SpinnerIcon = () => (
   <svg
     className="animate-spin"
@@ -2109,6 +2134,239 @@ const Leaderboard = ({ korisnik, onClose }) => {
     </div>
   );
 };
+
+// ─── GroupSettingsModal ───────────────────────────────────────────────────────
+const GroupSettingsModal = ({ chat, korisnik, onClose, onGroupUpdated, onGroupDeleted }) => {
+  const isAdmin = chat.is_admin;
+  const [clanovi, setClanovi] = useState([]);
+  const [loadingClanovi, setLoadingClanovi] = useState(true);
+  const [error, setError] = useState('');
+  const [tab, setTab] = useState('clanovi');
+  const [noviNaziv, setNoviNaziv] = useState(chat.naziv_grupe);
+  const [savingNaziv, setSavingNaziv] = useState(false);
+  const [deletingGroup, setDeletingGroup] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(false);
+  const [removingEmail, setRemovingEmail] = useState(null);
+
+  const headers = { 'Content-Type': 'application/json', 'X-User-Email': korisnik.email_korisnika };
+  const baseUrl = `http://localhost:3001/api/chats/group/${encodeURIComponent(chat.naziv_grupe)}`;
+
+  const ucitajClanove = async () => {
+    setLoadingClanovi(true);
+    try {
+      const res = await fetch(`${baseUrl}/members`, { headers });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error);
+      setClanovi(data);
+    } catch (e) { setError(e.message); }
+    finally { setLoadingClanovi(false); }
+  };
+
+  useEffect(() => { ucitajClanove(); }, []);
+
+  const handleDodajClana = async (k) => {
+    setError('');
+    try {
+      const res = await fetch(`${baseUrl}/members`, {
+        method: 'POST', headers,
+        body: JSON.stringify({ email_korisnika: k.email_korisnika }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error);
+      setClanovi((prev) => [...prev, data]);
+      onGroupUpdated({ ...chat, memberCount: (chat.memberCount || 0) + 1 });
+    } catch (e) { setError(e.message); }
+  };
+
+  const handleUkloniClana = async (email) => {
+    setRemovingEmail(email);
+    setError('');
+    try {
+      const res = await fetch(
+        `${baseUrl}/members/${encodeURIComponent(email)}`,
+        { method: 'DELETE', headers }
+      );
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error);
+      setClanovi((prev) => prev.filter((c) => c.email_korisnika !== email));
+      onGroupUpdated({ ...chat, memberCount: Math.max(0, (chat.memberCount || 1) - 1) });
+    } catch (e) { setError(e.message); }
+    finally { setRemovingEmail(null); }
+  };
+
+  const handlePreimenuj = async () => {
+    if (noviNaziv.trim() === chat.naziv_grupe || noviNaziv.trim().length < 2) return;
+    setSavingNaziv(true);
+    setError('');
+    try {
+      const res = await fetch(baseUrl, {
+        method: 'PATCH', headers,
+        body: JSON.stringify({ novi_naziv: noviNaziv.trim() }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error);
+      onGroupUpdated({ ...chat, naziv_grupe: data.naziv_grupe, name: data.naziv_grupe, id: `gr_${data.naziv_grupe}` });
+      onClose();
+    } catch (e) { setError(e.message); }
+    finally { setSavingNaziv(false); }
+  };
+
+  const handleObrisGrupu = async () => {
+    if (!confirmDelete) { setConfirmDelete(true); return; }
+    setDeletingGroup(true);
+    setError('');
+    try {
+      const res = await fetch(baseUrl, { method: 'DELETE', headers });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error);
+      onGroupDeleted(chat.id);
+      onClose();
+    } catch (e) {
+      setError(e.message);
+      setDeletingGroup(false);
+      setConfirmDelete(false);
+    }
+  };
+
+  const excludeEmails = clanovi.map((c) => c.email_korisnika);
+
+  return (
+    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+      <div className="bg-slate-900 border border-slate-700/60 rounded-2xl w-full max-w-sm shadow-2xl flex flex-col max-h-[85vh]">
+        <div className="flex items-center justify-between px-5 py-4 border-b border-slate-800/60 shrink-0">
+          <div>
+            <h2 className="text-white font-semibold text-sm">{chat.naziv_grupe}</h2>
+            <p className="text-slate-500 text-xs mt-0.5">
+              {isAdmin ? 'Postavke grupe · Admin' : 'Postavke grupe'}
+            </p>
+          </div>
+          <button onClick={onClose} className="text-slate-500 hover:text-slate-300 transition-colors p-1">
+            <XIcon />
+          </button>
+        </div>
+
+        <div className="flex gap-1 px-4 pt-3 pb-2 shrink-0">
+          {['clanovi', ...(isAdmin ? ['postavke'] : [])].map((t) => (
+            <button key={t} onClick={() => setTab(t)}
+              className={`flex-1 py-1.5 text-xs font-medium rounded-lg transition-all ${
+                tab === t ? 'bg-teal-500/15 text-teal-400 border border-teal-500/20' : 'text-slate-500 hover:text-slate-300'
+              }`}>
+              {t === 'clanovi' ? `Članovi (${clanovi.length})` : 'Postavke'}
+            </button>
+          ))}
+        </div>
+
+        {error && (
+          <div className="mx-4 mb-2 bg-red-500/10 border border-red-500/20 text-red-400 text-xs rounded-xl px-3 py-2 shrink-0">
+            {error}
+          </div>
+        )}
+
+        <div className="flex-1 overflow-y-auto px-4 pb-4">
+          {tab === 'clanovi' && (
+            <div className="space-y-3">
+              <div className="pt-1">
+                <label className="block text-xs font-medium text-slate-400 mb-1.5">Dodaj člana</label>
+                <KorisnikSearch
+                  placeholder="Pretraži po imenu ili emailu..."
+                  onSelect={handleDodajClana}
+                  excludeEmails={excludeEmails}
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-slate-400 mb-1.5">Trenutni članovi</label>
+                {loadingClanovi ? (
+                  <div className="flex items-center gap-2 text-slate-600 py-3">
+                    <SpinnerIcon /><span className="text-sm">Učitavam...</span>
+                  </div>
+                ) : (
+                  <div className="space-y-1.5">
+                    {clanovi.map((c) => {
+                      const name = `${c.ime_korisnika} ${c.prezime_korisnika}`;
+                      const isMe = c.email_korisnika === korisnik.email_korisnika;
+                      return (
+                        <div key={c.email_korisnika}
+                          className="flex items-center gap-2.5 bg-slate-800/50 border border-slate-700/40 rounded-xl px-3 py-2">
+                          <Avatar name={name} size="sm" avatarUrl={c.slika_profila} />
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-1.5">
+                              <p className="text-sm text-slate-200 font-medium truncate">{name}</p>
+                              {c.is_admin && (
+                                <span className="shrink-0 text-amber-400 flex items-center gap-0.5 text-[10px] font-medium">
+                                  <CrownIcon /> Admin
+                                </span>
+                              )}
+                              {isMe && <span className="text-[10px] text-teal-400 shrink-0">ti</span>}
+                            </div>
+                            <p className="text-[11px] text-slate-500 truncate">{c.email_korisnika}</p>
+                          </div>
+                          {isAdmin && !isMe && (
+                            <button
+                              onClick={() => handleUkloniClana(c.email_korisnika)}
+                              disabled={removingEmail === c.email_korisnika}
+                              className="shrink-0 text-slate-500 hover:text-red-400 transition-colors p-1 rounded-lg hover:bg-red-500/10 disabled:opacity-40"
+                              title="Ukloni člana"
+                            >
+                              {removingEmail === c.email_korisnika ? <SpinnerIcon /> : <TrashIcon />}
+                            </button>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {tab === 'postavke' && isAdmin && (
+            <div className="space-y-5 pt-1">
+              <div>
+                <label className="block text-xs font-medium text-slate-400 mb-1.5">Naziv grupe</label>
+                <div className="flex gap-2">
+                  <input type="text" value={noviNaziv} onChange={(e) => setNoviNaziv(e.target.value)}
+                    className="flex-1 bg-slate-800/60 border border-slate-700/60 rounded-xl px-3 py-2.5 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-teal-500/70 focus:bg-slate-800 transition-all"
+                  />
+                  <button onClick={handlePreimenuj}
+                    disabled={savingNaziv || noviNaziv.trim() === chat.naziv_grupe || noviNaziv.trim().length < 2}
+                    className="px-3 py-2.5 bg-teal-500/20 border border-teal-500/30 hover:bg-teal-500/30 disabled:opacity-40 disabled:cursor-not-allowed text-teal-400 rounded-xl text-xs font-medium transition-all flex items-center gap-1.5 shrink-0">
+                    {savingNaziv ? <SpinnerIcon /> : <EditIcon />} Spremi
+                  </button>
+                </div>
+              </div>
+              <div className="border-t border-slate-800 pt-4">
+                <p className="text-xs font-medium text-slate-500 mb-3 uppercase tracking-wide">Opasna zona</p>
+                {!confirmDelete ? (
+                  <button onClick={() => setConfirmDelete(true)}
+                    className="w-full py-2.5 text-sm font-medium text-red-400 border border-red-500/20 hover:bg-red-500/10 hover:border-red-500/40 rounded-xl transition-all flex items-center justify-center gap-2">
+                    <TrashIcon /> Obriši grupu
+                  </button>
+                ) : (
+                  <div className="bg-red-500/10 border border-red-500/20 rounded-xl p-3 space-y-3">
+                    <p className="text-xs text-red-300 text-center">
+                      Jesi li siguran? Ova radnja je nepovratna i uklanja grupu za sve članove.
+                    </p>
+                    <div className="flex gap-2">
+                      <button onClick={() => setConfirmDelete(false)}
+                        className="flex-1 py-2 text-xs font-medium text-slate-400 border border-slate-700 hover:border-slate-600 rounded-xl transition-all">
+                        Odustani
+                      </button>
+                      <button onClick={handleObrisGrupu} disabled={deletingGroup}
+                        className="flex-1 py-2 text-xs font-semibold text-white bg-red-600 hover:bg-red-500 disabled:opacity-50 rounded-xl transition-all flex items-center justify-center gap-1.5">
+                        {deletingGroup ? <><SpinnerIcon /> Brišem...</> : 'Da, obriši'}
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+};
+
 // ─── Chat formatters ─────────────────────────────────────────────────────────
 
 const formatTime = (ts) => {
@@ -2124,6 +2382,7 @@ const ChatView = ({
   onStartGame,
   onShowLeaderboard,
   onPokreniDnevniIzazov,
+  onOpenGroupSettings,
 }) => {
   const [messages, setMessages] = useState([]);
   const [loadingMsgs, setLoadingMsgs] = useState(true);
@@ -2285,13 +2544,22 @@ const ChatView = ({
         >
           🏆
         </button>
-        {chat.type === "group" && ( // ← DODANO (blok)
+        {chat.type === "group" && (
           <button
             onClick={onPokreniDnevniIzazov}
             title="Dnevni izazov"
             className="w-9 h-9 flex items-center justify-center rounded-xl text-slate-400 hover:text-teal-400 hover:bg-slate-800/60 transition-all text-lg"
           >
             🌍
+          </button>
+        )}
+        {chat.type === "group" && (
+          <button
+            onClick={onOpenGroupSettings}
+            title="Postavke grupe"
+            className="w-9 h-9 flex items-center justify-center rounded-xl text-slate-400 hover:text-teal-400 hover:bg-slate-800/60 transition-all"
+          >
+            <SettingsIcon />
           </button>
         )}
       </div>
@@ -2439,7 +2707,7 @@ const ChatView = ({
   );
 };
 
-export default function ChatPage({ korisnik, onOdjava }) {
+export default function ChatPage({ korisnik: korisnikProp, onOdjava, onKorisnikUpdate: onKorisnikUpdateExternal }) {
   const [chats, setChats] = useState([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState("");
@@ -2448,8 +2716,9 @@ export default function ChatPage({ korisnik, onOdjava }) {
   const [searchQuery, setSearchQuery] = useState("");
   const [showNewChat, setShowNewChat] = useState(false);
   const [showNewGroup, setShowNewGroup] = useState(false);
+  const [showGroupSettings, setShowGroupSettings] = useState(false);
   const [showLeaderboard, setShowLeaderboard] = useState(false);
-  const [aktivniKorisnik, setAktivniKorisnik] = useState(korisnik); // ← dodaj ovo
+  const [aktivniKorisnik, setAktivniKorisnik] = useState(korisnikProp);
   const [prikaziDnevniIzazov, setPrikaziDnevniIzazov] = useState(false);
 
   // ── Geo igra ───────────────────────────────────────────────────────────────
@@ -2467,7 +2736,7 @@ export default function ChatPage({ korisnik, onOdjava }) {
           setActiveGame({ id_battle: data.idBattle, faza: "lobby" });
           socket.emit("accept_game", {
             idBattle: data.idBattle,
-            prihvatioEmail: korisnik.email_korisnika,
+            prihvatioEmail: aktivniKorisnik.email_korisnika,
             chatId: data.chatId,
           });
           break;
@@ -2505,7 +2774,7 @@ export default function ChatPage({ korisnik, onOdjava }) {
           break;
       }
     },
-    [korisnik.email_korisnika],
+    [aktivniKorisnik.email_korisnika],
   );
 
   const handleStartGame = useCallback(
@@ -2517,13 +2786,13 @@ export default function ChatPage({ korisnik, onOdjava }) {
           chatId,
           idBattle: id_battle,
           runde,
-          inviterEmail: korisnik.email_korisnika,
+          inviterEmail: aktivniKorisnik.email_korisnika,
         });
       } catch (err) {
         alert(err.message);
       }
     },
-    [korisnik.email_korisnika],
+    [aktivniKorisnik.email_korisnika],
   );
 
   // ── Priče ──────────────────────────────────────────────────────────────────
@@ -2551,10 +2820,70 @@ export default function ChatPage({ korisnik, onOdjava }) {
   // ──────────────────────────────────────────────────────────────────────────
 
   useEffect(() => {
+    const email = aktivniKorisnik.email_korisnika;
+
+    // Registriraj korisnika čim se socket spoji (ili odmah ako je već spojen)
+    // Postavi email u auth PRIJE connect() da server zna tko se spaja odmah
+    socket.auth = { email };
+
+    const doRegister = () => socket.emit('register_user', { email });
+
+    if (socket.connected) {
+      doRegister();
+    } else {
+      socket.connect();
+      socket.once('connect', doRegister);
+    }
+
+    // ── Grupne promjene u realnom vremenu ──────────────────────────────────
+    const onGroupAdded = (novaGrupa) => {
+      setChats((prev) => {
+        if (prev.find((c) => c.id === novaGrupa.id)) return prev;
+        return [novaGrupa, ...prev];
+      });
+    };
+
+    const onGroupRemoved = ({ naziv_grupe }) => {
+      const chatId = `gr_${naziv_grupe}`;
+      setChats((prev) => prev.filter((c) => c.id !== chatId));
+      setActiveChat((prev) => (prev?.id === chatId ? null : prev));
+    };
+
+    const onGroupRenamed = ({ stari_naziv, novi_naziv, memberCount }) => {
+      const stariId = `gr_${stari_naziv}`;
+      const noviId = `gr_${novi_naziv}`;
+      setChats((prev) => prev.map((c) =>
+        c.id === stariId
+          ? { ...c, id: noviId, naziv_grupe: novi_naziv, name: novi_naziv, memberCount }
+          : c
+      ));
+      setActiveChat((prev) =>
+        prev?.id === stariId
+          ? { ...prev, id: noviId, naziv_grupe: novi_naziv, name: novi_naziv, memberCount }
+          : prev
+      );
+    };
+
+    const onMemberCountChanged = ({ naziv_grupe, memberCount }) => {
+      const chatId = `gr_${naziv_grupe}`;
+      setChats((prev) => prev.map((c) => c.id === chatId ? { ...c, memberCount } : c));
+      setActiveChat((prev) => prev?.id === chatId ? { ...prev, memberCount } : prev);
+    };
+
+    socket.on('group_added', onGroupAdded);
+    socket.on('group_removed', onGroupRemoved);
+    socket.on('group_renamed', onGroupRenamed);
+    socket.on('group_member_count_changed', onMemberCountChanged);
+
     return () => {
+      socket.off('connect', doRegister);
+      socket.off('group_added', onGroupAdded);
+      socket.off('group_removed', onGroupRemoved);
+      socket.off('group_renamed', onGroupRenamed);
+      socket.off('group_member_count_changed', onMemberCountChanged);
       socket.disconnect();
     };
-  }, []);
+  }, [aktivniKorisnik.email_korisnika]);
 
   const ucitajChatove = useCallback(async () => {
     setLoading(true);
@@ -2599,8 +2928,20 @@ export default function ChatPage({ korisnik, onOdjava }) {
     setActiveTab("Svi");
   };
 
+
+  const handleGroupUpdated = (updatedChat) => {
+    setChats((prev) => prev.map((c) => c.id === updatedChat.id ? updatedChat : c));
+    if (activeChat?.id === updatedChat.id) setActiveChat(updatedChat);
+  };
+
+  const handleGroupDeleted = (chatId) => {
+    setChats((prev) => prev.filter((c) => c.id !== chatId));
+    if (activeChat?.id === chatId) setActiveChat(null);
+  };
+
   useEffect(() => {
     setPrikaziDnevniIzazov(false);
+    setShowGroupSettings(false);
   }, [activeChat?.id]);
 
   return (
@@ -2670,7 +3011,7 @@ export default function ChatPage({ korisnik, onOdjava }) {
           onOdjava={onOdjava}
           onKorisnikUpdate={(updated) => {
             setAktivniKorisnik(updated);
-            sessionStorage.setItem("korisnik", JSON.stringify(updated));
+            if (onKorisnikUpdateExternal) onKorisnikUpdateExternal(updated);
           }}
         />{" "}
       </aside>
@@ -2696,13 +3037,23 @@ export default function ChatPage({ korisnik, onOdjava }) {
               onGameEvent={handleGameEvent}
               onStartGame={() => handleStartGame(activeChat.id)}
               onShowLeaderboard={() => setShowLeaderboard(true)}
-              onPokreniDnevniIzazov={() => setPrikaziDnevniIzazov(true)} // ← DODANO
+              onPokreniDnevniIzazov={() => setPrikaziDnevniIzazov(true)}
+              onOpenGroupSettings={() => setShowGroupSettings(true)}
             />
           )
         ) : (
           <EmptyState />
         )}
       </main>
+      {showGroupSettings && activeChat?.type === "group" && (
+        <GroupSettingsModal
+          chat={activeChat}
+          korisnik={aktivniKorisnik}
+          onClose={() => setShowGroupSettings(false)}
+          onGroupUpdated={handleGroupUpdated}
+          onGroupDeleted={handleGroupDeleted}
+        />
+      )}
       {showNewChat && (
         <NewChatModal
           onClose={() => setShowNewChat(false)}

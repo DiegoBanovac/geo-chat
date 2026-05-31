@@ -4,6 +4,27 @@ const Korisnik = require('../models/Korisnik');
 
 module.exports = function registerChatSocket(io) {
   io.on('connection', (socket) => {
+
+    // ── Registriraj korisnika odmah pri konekciji ───────────────────────────
+    // Email dolazi iz socket.handshake.auth koji frontend šalje pri connect().
+    // Ovo je pouzdanije od čekanja na 'register_user' event jer se izvršava
+    // atomično — server zna tko je korisnik čim se konekcija uspostavi.
+    const emailIzAuth = socket.handshake.auth?.email;
+    if (emailIzAuth) {
+      socket.join(`user_${emailIzAuth}`);
+      socket.data.email = emailIzAuth;
+    }
+
+    // ── Fallback: register_user event (za kompatibilnost) ───────────────────
+    socket.on('register_user', ({ email }) => {
+      if (email && email !== socket.data.email) {
+        // Makni iz starog rooma ako postoji
+        if (socket.data.email) socket.leave(`user_${socket.data.email}`);
+        socket.join(`user_${email}`);
+        socket.data.email = email;
+      }
+    });
+
     socket.on('join_chat', ({ chatId }) => {
       socket.join(chatId);
     });
