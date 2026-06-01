@@ -70,6 +70,90 @@ app.get("/api/leaderboard/grupe", async (req, res) => {
   }
 });
 
+// GET /api/leaderboard/zajednicke-grupe?drugi=email
+app.get('/api/leaderboard/zajednicke-grupe', async (req, res) => {
+  const email = req.headers['x-user-email'];
+  if (!email) return res.status(401).json({ poruka: 'Nije autoriziran' });
+  const { drugi } = req.query;
+  if (!drugi) return res.status(400).json({ poruka: 'Parametar drugi je obavezan' });
+  try {
+    const grupe = await sequelize.query(
+      `SELECT l.naziv_grupe
+       FROM geochat.leaderboard l
+       WHERE l.email_korisnika = :email
+         AND l.naziv_grupe IN (
+           SELECT naziv_grupe FROM geochat.leaderboard WHERE email_korisnika = :drugi
+         )
+       ORDER BY l.naziv_grupe`,
+      { replacements: { email, drugi }, type: QueryTypes.SELECT }
+    );
+    res.json(grupe);
+  } catch (err) {
+    console.error('Greška zajednicke-grupe:', err);
+    res.status(500).json({ poruka: 'Interna greška servera' });
+  }
+});
+app.get('/api/leaderboard/dvoboj', async (req, res) => {
+  const email = req.headers['x-user-email'];
+  if (!email) return res.status(401).json({ poruka: 'Nije autoriziran' });
+  const { drugi } = req.query;
+  if (!drugi) return res.status(400).json({ poruka: 'Parametar drugi je obavezan' });
+  try {
+    const rezultati = await sequelize.query(
+      `SELECT
+         email,
+         SUM(ukupni_bodovi) AS ukupni_bodovi,
+         SUM(broj_pobjeda)  AS broj_pobjeda
+       FROM (
+         SELECT
+           ir_email_1 AS email,
+           SUM(bodovi_ir_1) AS ukupni_bodovi,
+           COUNT(CASE WHEN pobjednik_email = ir_email_1 THEN 1 END) AS broj_pobjeda
+         FROM geochat.battle
+         WHERE status_bitke = 'zavrsena'
+           AND ((ir_email_1 = :email AND ir_email_2 = :drugi)
+             OR (ir_email_1 = :drugi AND ir_email_2 = :email))
+         GROUP BY ir_email_1
+         UNION ALL
+         SELECT
+           ir_email_2 AS email,
+           SUM(bodovi_ir_2) AS ukupni_bodovi,
+           COUNT(CASE WHEN pobjednik_email = ir_email_2 THEN 1 END) AS broj_pobjeda
+         FROM geochat.battle
+         WHERE status_bitke = 'zavrsena'
+           AND ((ir_email_1 = :email AND ir_email_2 = :drugi)
+             OR (ir_email_1 = :drugi AND ir_email_2 = :email))
+         GROUP BY ir_email_2
+       ) AS kombinacija
+       GROUP BY email
+       ORDER BY ukupni_bodovi DESC`,
+      { replacements: { email, drugi }, type: QueryTypes.SELECT }
+    );
+
+    if (rezultati.length === 0) return res.json([]);
+
+    const emailovi = rezultati.map(r => r.email);
+    const korisnici = await sequelize.query(
+      `SELECT email_korisnika, ime_korisnika, prezime_korisnika, slika_profila
+       FROM geochat.korisnik
+       WHERE email_korisnika IN (:emailovi)`,
+      { replacements: { emailovi }, type: QueryTypes.SELECT }
+    );
+
+    const korisnikMap = Object.fromEntries(korisnici.map(k => [k.email_korisnika, k]));
+    const spojen = rezultati.map(r => ({
+      email_korisnika: r.email,
+      ukupni_bodovi: Number(r.ukupni_bodovi),
+      broj_pobjeda: Number(r.broj_pobjeda),
+      ...korisnikMap[r.email],
+    }));
+
+    res.json(spojen);
+  } catch (err) {
+    console.error('Greška leaderboard/dvoboj:', err);
+    res.status(500).json({ poruka: 'Interna greška servera' });
+  }
+});
 // GET /api/leaderboard/:naziv_grupe
 // Rang lista za grupu (samo ako si član)
 app.get("/api/leaderboard/:naziv_grupe", async (req, res) => {
@@ -105,7 +189,6 @@ app.get("/api/leaderboard/:naziv_grupe", async (req, res) => {
     res.status(500).json({ poruka: "Interna greška servera" });
   }
 });
-
 // ─────────────────────────────────────────────────────────────────────────────
 
 registerChatSocket(io);
