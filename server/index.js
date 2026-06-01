@@ -31,6 +31,7 @@ const io = new Server(server, {
 app.set("io", io);
 const PORT = process.env.PORT || 3001;
 
+app.options('*', cors({ origin: CORS_ORIGIN }));
 app.use(cors({ origin: CORS_ORIGIN }));
 app.use(express.json());
 
