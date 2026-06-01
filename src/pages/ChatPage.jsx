@@ -1,4 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from "react";
+
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import {
@@ -306,7 +308,7 @@ const Avatar = ({ name = "", size = "md", avatarUrl = null }) => {
       className={`${sz} ${getAvatarColor(name)} rounded-full flex items-center justify-center font-semibold text-white shrink-0 overflow-hidden`}
     >
       {avatarUrl
-        ? <img src={`http://localhost:3001${avatarUrl}`} alt={name} className="w-full h-full object-cover" />
+        ? <img src={`${API_URL}${avatarUrl}`} alt={name} className="w-full h-full object-cover" />
         : getInitials(name)
       }
     </div>
@@ -778,7 +780,7 @@ const ProfileEditModal = ({ korisnik, onClose, onSave }) => {
   const [avatarFile, setAvatarFile] = useState(null);
   const [avatarPreview, setAvatarPreview] = useState(
     korisnik.slika_profila
-      ? `http://localhost:3001${korisnik.slika_profila}`
+      ? `${API_URL}${korisnik.slika_profila}`
       : null,
   );
   const avatarInputRef = useRef(null);
@@ -809,7 +811,7 @@ const ProfileEditModal = ({ korisnik, onClose, onSave }) => {
         const fd = new FormData();
         fd.append("slika_profila", avatarFile);
         const avatarRes = await fetch(
-          `http://localhost:3001/api/korisnici/${encodeURIComponent(korisnik.email_korisnika)}/avatar`,
+          `${API_URL}/api/korisnici/${encodeURIComponent(korisnik.email_korisnika)}/avatar`,
           { method: "POST", headers: { "X-User-Email": korisnik.email_korisnika }, body: fd },
         );
         if (!avatarRes.ok) {
@@ -824,7 +826,7 @@ const ProfileEditModal = ({ korisnik, onClose, onSave }) => {
       if (novaLozinka) body.lozinka_korisnika = novaLozinka;
 
       const res = await fetch(
-        `http://localhost:3001/api/korisnici/${encodeURIComponent(korisnik.email_korisnika)}`,
+        `${API_URL}/api/korisnici/${encodeURIComponent(korisnik.email_korisnika)}`,
         {
           method: "PUT",
           headers: { "Content-Type": "application/json", "X-User-Email": korisnik.email_korisnika },
@@ -1003,7 +1005,7 @@ const ProfileFooter = ({ korisnik, onOdjava, onKorisnikUpdate }) => {
           className={`w-8 h-8 rounded-full ${getAvatarColor(name)} flex items-center justify-center text-white text-xs font-bold shrink-0 hover:ring-2 hover:ring-teal-500/50 transition-all overflow-hidden`}
         >
           {korisnik.slika_profila
-            ? <img src={`http://localhost:3001${korisnik.slika_profila}`} alt={name} className="w-full h-full object-cover" />
+            ? <img src={`${API_URL}${korisnik.slika_profila}`} alt={name} className="w-full h-full object-cover" />
             : getInitials(name)
           }
         </button>
@@ -1401,7 +1403,7 @@ const StoriesStrip = ({ korisnik, storyGroups, onOpenStory, onAddStory }) => {
           onClick={() => (myGroup ? onOpenStory(myGroup, 0) : onAddStory())}
           avatarUrl={
             korisnik.slika_profila && korisnik.slika_profila !== ""
-              ? `http://localhost:3001${korisnik.slika_profila}`
+              ? `${API_URL}${korisnik.slika_profila}`
               : null
           }
         />
@@ -1415,7 +1417,7 @@ const StoriesStrip = ({ korisnik, storyGroups, onOpenStory, onAddStory }) => {
             onClick={() => onOpenStory(group, 0)}
             avatarUrl={
               group.slika_profila
-                ? `http://localhost:3001${group.slika_profila}`
+                ? `${API_URL}${group.slika_profila}`
                 : null
             }
           />
@@ -1915,7 +1917,7 @@ const Leaderboard = ({ korisnik, onClose }) => {
     const dohvati = async () => {
       try {
         setUcitavamGrupe(true);
-        const res = await fetch("http://localhost:3001/api/leaderboard/grupe", {
+        const res = await fetch(`${API_URL}/api/leaderboard/grupe`, {
           headers,
         });
         if (!res.ok) throw new Error("Greška pri dohvaćanju grupa");
@@ -1938,7 +1940,7 @@ const Leaderboard = ({ korisnik, onClose }) => {
         setUcitavamRang(true);
         setGreska(null);
         const res = await fetch(
-          `http://localhost:3001/api/leaderboard/${encodeURIComponent(odabranaGrupa)}`,
+          `${API_URL}/api/leaderboard/${encodeURIComponent(odabranaGrupa)}`,
           { headers },
         );
         if (!res.ok) throw new Error("Greška pri dohvaćanju rang liste");
@@ -2149,7 +2151,7 @@ const GroupSettingsModal = ({ chat, korisnik, onClose, onGroupUpdated, onGroupDe
   const [removingEmail, setRemovingEmail] = useState(null);
 
   const headers = { 'Content-Type': 'application/json', 'X-User-Email': korisnik.email_korisnika };
-  const baseUrl = `http://localhost:3001/api/chats/group/${encodeURIComponent(chat.naziv_grupe)}`;
+  const baseUrl = `${API_URL}/api/chats/group/${encodeURIComponent(chat.naziv_grupe)}`;
 
   const ucitajClanove = async () => {
     setLoadingClanovi(true);
@@ -2475,7 +2477,7 @@ const ChatView = ({
       }
 
       try {
-        await fetch("http://localhost:3001/api/messages/upload", {
+        await fetch(`${API_URL}/api/messages/upload`, {
           method: "POST",
           headers: { "X-User-Email": korisnik.email_korisnika },
           body: formData,
@@ -2619,12 +2621,12 @@ const ChatView = ({
                   )}
                   {msg.tip_medija === "slika" && msg.poruka_medij_url ? (
                     <img
-                      src={`http://localhost:3001${msg.poruka_medij_url}`}
+                      src={`${API_URL}${msg.poruka_medij_url}`}
                       alt="slika"
                       className="max-w-xs rounded-2xl overflow-hidden object-cover cursor-pointer"
                       onClick={() =>
                         window.open(
-                          `http://localhost:3001${msg.poruka_medij_url}`,
+                          `${API_URL}${msg.poruka_medij_url}`,
                           "_blank",
                         )
                       }

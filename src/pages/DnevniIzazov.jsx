@@ -245,7 +245,7 @@ export default function DnevniIzazov({ chat, korisnik, onZatvori }) {
   const [prikaziKartu, setPrikaziKartu] = useState(false); // toggle Street View / Karta na mobilnom
 
   const nazivGrupe = chat.naziv_grupe;
-  const apiBase    = 'http://localhost:3001/api';
+  const apiBase    = `${import.meta.env.VITE_API_URL || 'http://localhost:3001'}/api`;
   const headeri    = { 'X-User-Email': korisnik.email_korisnika };
 
   // ─── Učitaj podatke ──────────────────────────────────────────────────────

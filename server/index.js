@@ -24,13 +24,14 @@ if (!fs.existsSync(uploadsDir)) fs.mkdirSync(uploadsDir);
 
 const app = express();
 const server = http.createServer(app);
+const CORS_ORIGIN = process.env.CORS_ORIGIN || "http://localhost:5173";
 const io = new Server(server, {
-  cors: { origin: "http://localhost:5173", methods: ["GET", "POST"] },
+  cors: { origin: CORS_ORIGIN, methods: ["GET", "POST"] },
 });
 app.set("io", io);
 const PORT = process.env.PORT || 3001;
 
-app.use(cors({ origin: "http://localhost:5173" }));
+app.use(cors({ origin: CORS_ORIGIN }));
 app.use(express.json());
 
 // Servira uploadane slike
