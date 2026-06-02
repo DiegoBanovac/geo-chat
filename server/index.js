@@ -24,15 +24,28 @@ if (!fs.existsSync(uploadsDir)) fs.mkdirSync(uploadsDir);
 
 const app = express();
 const server = http.createServer(app);
-const CORS_ORIGIN = process.env.CORS_ORIGIN || "http://localhost:5173";
+
+// Podržava više origina odvojenih zarezom, npr: "https://app.vercel.app,http://localhost:5173"
+const rawOrigins = (process.env.CORS_ORIGIN || "http://localhost:5173")
+  .split(",")
+  .map((o) => o.trim())
+  .filter(Boolean);
+const CORS_ORIGIN = rawOrigins.length === 1 ? rawOrigins[0] : rawOrigins;
+
+const corsOptions = {
+  origin: CORS_ORIGIN,
+  allowedHeaders: ["Content-Type", "X-User-Email"],
+  methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
+};
+
 const io = new Server(server, {
   cors: { origin: CORS_ORIGIN, methods: ["GET", "POST"] },
 });
 app.set("io", io);
 const PORT = process.env.PORT || 3001;
 
-app.options('*', cors({ origin: CORS_ORIGIN }));
-app.use(cors({ origin: CORS_ORIGIN }));
+app.options("*", cors(corsOptions));
+app.use(cors(corsOptions));
 app.use(express.json());
 
 // Servira uploadane slike
