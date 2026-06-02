@@ -1903,7 +1903,7 @@ const inicijali = (ime, prezime, email) => {
 
 const RANK_BADGE = ["👑", "🥈", "🥉"];
 
-const Leaderboard = ({ korisnik, onClose }) => {
+const Leaderboard = ({ korisnik, onClose, chat }) => {
   const [grupe, setGrupe] = useState([]);
   const [odabranaGrupa, setOdabranaGrupa] = useState(null);
   const [rang, setRang] = useState([]);
@@ -1917,13 +1917,26 @@ const Leaderboard = ({ korisnik, onClose }) => {
     const dohvati = async () => {
       try {
         setUcitavamGrupe(true);
-        const res = await fetch(`${API_URL}/api/leaderboard/grupe`, {
-          headers,
-        });
-        if (!res.ok) throw new Error("Greška pri dohvaćanju grupa");
-        const data = await res.json();
-        setGrupe(data);
-        if (data.length > 0) setOdabranaGrupa(data[0].naziv_grupe);
+
+        if (chat?.type === "group") {
+          setGrupe([{ naziv_grupe: chat.naziv_grupe }]);
+          setOdabranaGrupa(chat.naziv_grupe);
+        } else {
+          const drugiEmail =
+            chat?.email_korisnika_2 === korisnik.email_korisnika
+              ? chat?.email_korisnika_1
+              : chat?.email_korisnika_2;
+
+          const res = await fetch(
+            `${API_URL}/api/leaderboard/dvoboj?drugi=${encodeURIComponent(drugiEmail)}`,
+            { headers }
+          );
+          if (!res.ok) throw new Error("Greška pri dohvaćanju dvoboja");
+          const data = await res.json();
+          setRang(data);
+          setGrupe([]);
+          setOdabranaGrupa("dvoboj");
+        }
       } catch (e) {
         setGreska(e.message);
       } finally {
@@ -1931,10 +1944,10 @@ const Leaderboard = ({ korisnik, onClose }) => {
       }
     };
     dohvati();
-  }, [korisnik.email_korisnika]);
+  }, [korisnik.email_korisnika, chat?.id]);
 
   useEffect(() => {
-    if (!odabranaGrupa) return;
+    if (!odabranaGrupa || odabranaGrupa === "dvoboj") return;
     const dohvati = async () => {
       try {
         setUcitavamRang(true);
@@ -3024,6 +3037,7 @@ export default function ChatPage({ korisnik: korisnikProp, onOdjava, onKorisnikU
             <Leaderboard
               korisnik={aktivniKorisnik}
               onClose={() => setShowLeaderboard(false)}
+              chat={activeChat}
             />
           ) : prikaziDnevniIzazov && activeChat.type === "group" ? (
             <DnevniIzazov
