@@ -1915,6 +1915,10 @@ const Leaderboard = ({ korisnik, onClose, chat }) => {
 
   useEffect(() => {
     const dohvati = async () => {
+      setGrupe([]);
+      setRang([]);
+      setOdabranaGrupa(null);
+      setGreska(null);
       try {
         setUcitavamGrupe(true);
 
@@ -1922,10 +1926,12 @@ const Leaderboard = ({ korisnik, onClose, chat }) => {
           setGrupe([{ naziv_grupe: chat.naziv_grupe }]);
           setOdabranaGrupa(chat.naziv_grupe);
         } else {
-          const drugiEmail =
-            chat?.email_korisnika_2 === korisnik.email_korisnika
-              ? chat?.email_korisnika_1
-              : chat?.email_korisnika_2;
+          const drugiEmail = chat?.drugiEmail;
+
+          if (!drugiEmail) {
+            setGreska("Nepoznat sugovornik");
+            return;
+          }
 
           const res = await fetch(
             `${API_URL}/api/leaderboard/dvoboj?drugi=${encodeURIComponent(drugiEmail)}`,
